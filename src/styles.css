@@ -1,0 +1,497 @@
+:root {
+  color: #132922;
+  background: #e8f1ec;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --brand: #105341;
+  --brand-dark: #0a3d30;
+  --ink: #132922;
+  --muted: #62746d;
+  --surface: #fbfdfb;
+  --soft: #eef5ef;
+  --line: #1329221f;
+  --warm: #fff2d1;
+  --cool: #dceef0;
+  --rest: #efe7d9;
+  --danger: #8b3820;
+  --shadow: 0 18px 50px #0b2a221c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background:
+    linear-gradient(90deg, #1053410a 1px, transparent 1px),
+    linear-gradient(180deg, #1053410a 1px, transparent 1px),
+    linear-gradient(180deg, #d8ebdf 0%, #eef5ef 100%);
+  background-size:
+    22px 22px,
+    22px 22px,
+    cover;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  min-height: 46px;
+  padding: 0.75rem 1rem;
+  background: var(--brand);
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fffefa;
+  color: var(--ink);
+  padding: 0.9rem 1rem;
+}
+
+textarea {
+  resize: vertical;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.app-shell {
+  width: min(100%, 34rem);
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: 0.8rem 0.85rem 6.5rem;
+}
+
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.4rem 0 0.8rem;
+  backdrop-filter: blur(16px);
+}
+
+.top-bar span,
+.eyebrow {
+  color: var(--brand);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.top-bar strong {
+  display: block;
+}
+
+.ghost-button,
+.secondary-action {
+  background: #ffffffb8;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.setup-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.intro-panel,
+.work-panel,
+.status-panel,
+.round-summary,
+.mini-table,
+.history-item {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #fffffff0;
+  box-shadow: var(--shadow);
+}
+
+.intro-panel {
+  padding: 1.25rem;
+  min-height: 17rem;
+  display: grid;
+  align-content: end;
+  gap: 1rem;
+  background:
+    linear-gradient(145deg, #105341 0%, #17775d 48%, #f2d08f 100%);
+  color: white;
+  overflow: hidden;
+  position: relative;
+}
+
+.intro-panel::before {
+  content: "";
+  position: absolute;
+  width: 13rem;
+  height: 13rem;
+  border: 18px solid #ffffff35;
+  border-radius: 50%;
+  right: -3rem;
+  top: -2rem;
+}
+
+.intro-panel .eyebrow,
+.intro-panel p {
+  color: #ffffffd9;
+}
+
+.intro-panel h1 {
+  position: relative;
+  font-size: clamp(2.15rem, 12vw, 3.5rem);
+  line-height: 0.94;
+  letter-spacing: -0.045em;
+}
+
+.work-panel {
+  padding: 1rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.work-panel label {
+  font-weight: 900;
+}
+
+.metric-row {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.metric {
+  position: relative;
+  display: grid;
+  gap: 0.1rem;
+  min-width: 5.7rem;
+  border-radius: 14px;
+  background: #ffffff24;
+  padding: 0.65rem 0.75rem;
+}
+
+.metric small {
+  color: #ffffffc7;
+  font-weight: 800;
+}
+
+.setup-footer,
+.inline-add {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.setup-footer button,
+.inline-add button {
+  white-space: nowrap;
+}
+
+.ready-label {
+  flex: 1;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.ready-label.ready {
+  color: var(--brand);
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip-list span,
+.team-column > span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  padding: 0.4rem 0.65rem;
+  font-weight: 800;
+}
+
+.status-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.status-panel h1 {
+  margin-top: 0.25rem;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.status-panel > strong {
+  min-width: 5rem;
+  text-align: right;
+  color: var(--brand);
+  font-size: 1.2rem;
+}
+
+.primary-action {
+  min-height: 58px;
+  font-size: 1rem;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.team-column {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 0.7rem;
+}
+
+.team-column h2 {
+  font-size: 0.9rem;
+}
+
+.team-column.a {
+  background: var(--warm);
+}
+
+.team-column.b {
+  background: var(--cool);
+}
+
+.team-column.rest {
+  background: var(--rest);
+}
+
+.team-column > span {
+  border-radius: 11px;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.result-dock {
+  position: fixed;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100% - 1rem, 33rem);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #fffffff2;
+  box-shadow: var(--shadow);
+  padding: 0.65rem;
+}
+
+.result-dock button {
+  min-height: 64px;
+  padding: 0.5rem;
+}
+
+.result-dock button:first-child {
+  background: #15683e;
+}
+
+.result-dock button:nth-child(2) {
+  background: #ded7c4;
+  color: var(--ink);
+}
+
+.result-dock button:last-child {
+  background: var(--danger);
+}
+
+.round-summary {
+  padding: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.mini-table,
+.leader-list,
+.player-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.mini-table {
+  padding: 1rem;
+}
+
+.mini-table > div,
+.leader-row,
+.player-row,
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fffefa;
+  padding: 0.8rem 0.9rem;
+}
+
+.mini-table span,
+.rank {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #10534118;
+  font-weight: 900;
+}
+
+.leader-row div,
+.player-row div,
+.history-item div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.leader-row span,
+.player-row span,
+.history-item span,
+.muted-text {
+  color: var(--muted);
+}
+
+.points {
+  color: var(--brand);
+  font-size: 1.6rem;
+}
+
+.toggle {
+  min-height: 40px;
+  background: #ffffff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.toggle.active {
+  background: #dcefe7;
+  color: var(--brand-dark);
+}
+
+.error-text {
+  color: var(--danger);
+  font-weight: 800;
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0.75rem;
+  transform: translateX(-50%);
+  width: min(100% - 1rem, 33rem);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.15rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffffdd;
+  padding: 0.25rem;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.bottom-nav button {
+  min-height: 48px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.3rem;
+  display: grid;
+  gap: 0.1rem;
+  font-size: 0.68rem;
+}
+
+.bottom-nav button.active {
+  background: #1053411b;
+  color: var(--brand-dark);
+}
+
+@media (min-width: 760px) {
+  .app-shell {
+    width: min(100%, 58rem);
+  }
+
+  .setup-layout {
+    grid-template-columns: 0.9fr 1.1fr;
+    align-items: start;
+  }
+
+  .bottom-nav,
+  .result-dock {
+    width: min(100% - 1rem, 42rem);
+  }
+}
+
+@media (max-width: 420px) {
+  .setup-footer,
+  .inline-add {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .status-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .status-panel > strong {
+    text-align: left;
+  }
+}
