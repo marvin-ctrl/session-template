@@ -236,6 +236,11 @@ function CurrentRound({ session, stats, dispatch }) {
           <RotateCcw size={18} />
           Undo Last Result
         </button>
+        {session.rounds.length > 0 ? (
+          <button className="secondary-action" onClick={() => dispatch({ type: 'FINISH_SESSION' })}>
+            Finish Session
+          </button>
+        ) : null}
       </section>
     );
   }
