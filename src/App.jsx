@@ -26,6 +26,7 @@ import {
   startSession,
 } from './engine/sessionEngine.js';
 import { exportStateJson, importStateJson, loadStoredState, saveStoredState } from './engine/storage.js';
+import { adjustTimerDuration, formatClock } from './engine/timer.js';
 
 const tabs = [
   ['current', 'Current', Activity],
@@ -305,13 +306,10 @@ function GameTimer({ seconds }) {
   };
 
   const adjustDuration = (changeSeconds) => {
-    setDurationSeconds((currentDuration) => {
-      const nextDuration = Math.max(60, Math.min(900, currentDuration + changeSeconds));
-      setRemainingSeconds((currentRemaining) => {
-        if (currentRemaining === currentDuration || isFinished) return nextDuration;
-        return Math.max(0, Math.min(nextDuration, currentRemaining + changeSeconds));
-      });
-      return nextDuration;
+    setRemainingSeconds((currentRemaining) => {
+      const adjusted = adjustTimerDuration(durationSeconds, currentRemaining, changeSeconds, isFinished);
+      setDurationSeconds(adjusted.durationSeconds);
+      return adjusted.remainingSeconds;
     });
   };
 
@@ -348,12 +346,6 @@ function GameTimer({ seconds }) {
       </div>
     </section>
   );
-}
-
-function formatClock(totalSeconds) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function PlayersScreen({ session, stats, dispatch }) {
