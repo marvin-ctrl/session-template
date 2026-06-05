@@ -318,6 +318,81 @@ p {
   overflow-wrap: anywhere;
 }
 
+.timer-panel {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #0f4738;
+  color: white;
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.timer-panel .eyebrow {
+  color: #ffffffc9;
+}
+
+.timer-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.timer-panel-header strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: clamp(3.1rem, 18vw, 5rem);
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+}
+
+.timer-panel-header > span {
+  border: 1px solid #ffffff2e;
+  border-radius: 999px;
+  background: #ffffff1c;
+  padding: 0.35rem 0.65rem;
+  font-weight: 900;
+}
+
+.timer-track {
+  width: 100%;
+  height: 0.8rem;
+  border-radius: 999px;
+  background: #ffffff24;
+  overflow: hidden;
+}
+
+.timer-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f2d08f, #ffffff);
+  transition: width 0.25s ease;
+}
+
+.timer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.timer-actions button {
+  background: #ffffff;
+  color: var(--brand-dark);
+}
+
+.timer-actions .secondary-action {
+  background: #ffffff1c;
+  color: white;
+  border-color: #ffffff2e;
+}
+
+.timer-panel-finished {
+  background: #7a2f1d;
+}
+
 .result-dock {
   position: fixed;
   bottom: 5.5rem;

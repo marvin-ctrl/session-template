@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   Activity,
-  ClipboardList,
   Download,
   History,
+  Pause,
   Play,
   RotateCcw,
   Save,
+  TimerReset,
   Trophy,
   Upload,
   Users,
@@ -260,11 +261,14 @@ function CurrentRound({ session, stats, dispatch }) {
           Start Round
         </button>
       ) : (
-        <div className="result-dock">
-          <button onClick={() => dispatch({ type: 'RECORD_RESULT', result: 'teamA' })}>Team A Won</button>
-          <button onClick={() => dispatch({ type: 'RECORD_RESULT', result: 'draw' })}>Draw</button>
-          <button onClick={() => dispatch({ type: 'RECORD_RESULT', result: 'teamB' })}>Team B Won</button>
-        </div>
+        <>
+          <GameTimer key={visibleRound.id} seconds={SESSION_CONFIG.gameSeconds} />
+          <div className="result-dock">
+            <button onClick={() => dispatch({ type: 'RECORD_RESULT', result: 'teamA' })}>Team A Won</button>
+            <button onClick={() => dispatch({ type: 'RECORD_RESULT', result: 'draw' })}>Draw</button>
+            <button onClick={() => dispatch({ type: 'RECORD_RESULT', result: 'teamB' })}>Team B Won</button>
+          </div>
+        </>
       )}
       <LeaderboardMini rows={stats.leaderboard.slice(0, 3)} />
       <button className="secondary-action" disabled={session.currentRound} onClick={() => dispatch({ type: 'FINISH_SESSION' })}>
@@ -272,6 +276,63 @@ function CurrentRound({ session, stats, dispatch }) {
       </button>
     </section>
   );
+}
+
+function GameTimer({ seconds }) {
+  const [remainingSeconds, setRemainingSeconds] = useState(seconds);
+  const [isRunning, setIsRunning] = useState(true);
+  const elapsedPercent = ((seconds - remainingSeconds) / seconds) * 100;
+  const isFinished = remainingSeconds === 0;
+
+  useEffect(() => {
+    if (!isRunning || isFinished) return undefined;
+    const interval = window.setInterval(() => {
+      setRemainingSeconds((current) => {
+        if (current <= 1) {
+          setIsRunning(false);
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [isRunning, isFinished]);
+
+  const resetTimer = () => {
+    setRemainingSeconds(seconds);
+    setIsRunning(false);
+  };
+
+  return (
+    <section className={isFinished ? 'timer-panel timer-panel-finished' : 'timer-panel'}>
+      <div className="timer-panel-header">
+        <div>
+          <p className="eyebrow">Game Timer</p>
+          <strong>{formatClock(remainingSeconds)}</strong>
+        </div>
+        <span>{isFinished ? 'Time' : isRunning ? 'Running' : 'Paused'}</span>
+      </div>
+      <div className="timer-track" aria-hidden="true">
+        <span style={{ width: `${elapsedPercent}%` }} />
+      </div>
+      <div className="timer-actions">
+        <button onClick={() => setIsRunning((current) => !current)} disabled={isFinished}>
+          {isRunning ? <Pause size={18} /> : <Play size={18} />}
+          {isRunning ? 'Pause' : 'Start'}
+        </button>
+        <button className="secondary-action" onClick={resetTimer}>
+          <TimerReset size={18} />
+          Reset
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function formatClock(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function PlayersScreen({ session, stats, dispatch }) {
