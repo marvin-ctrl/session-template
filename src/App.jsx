@@ -279,9 +279,10 @@ function CurrentRound({ session, stats, dispatch }) {
 }
 
 function GameTimer({ seconds }) {
+  const [durationSeconds, setDurationSeconds] = useState(seconds);
   const [remainingSeconds, setRemainingSeconds] = useState(seconds);
   const [isRunning, setIsRunning] = useState(true);
-  const elapsedPercent = ((seconds - remainingSeconds) / seconds) * 100;
+  const elapsedPercent = ((durationSeconds - remainingSeconds) / durationSeconds) * 100;
   const isFinished = remainingSeconds === 0;
 
   useEffect(() => {
@@ -299,8 +300,19 @@ function GameTimer({ seconds }) {
   }, [isRunning, isFinished]);
 
   const resetTimer = () => {
-    setRemainingSeconds(seconds);
+    setRemainingSeconds(durationSeconds);
     setIsRunning(false);
+  };
+
+  const adjustDuration = (changeSeconds) => {
+    setDurationSeconds((currentDuration) => {
+      const nextDuration = Math.max(60, Math.min(900, currentDuration + changeSeconds));
+      setRemainingSeconds((currentRemaining) => {
+        if (currentRemaining === currentDuration || isFinished) return nextDuration;
+        return Math.max(0, Math.min(nextDuration, currentRemaining + changeSeconds));
+      });
+      return nextDuration;
+    });
   };
 
   return (
@@ -314,6 +326,15 @@ function GameTimer({ seconds }) {
       </div>
       <div className="timer-track" aria-hidden="true">
         <span style={{ width: `${elapsedPercent}%` }} />
+      </div>
+      <div className="timer-adjust" aria-label="Adjust timer duration">
+        <button onClick={() => adjustDuration(-30)} disabled={durationSeconds <= 60}>
+          -30s
+        </button>
+        <strong>{formatClock(durationSeconds)}</strong>
+        <button onClick={() => adjustDuration(30)} disabled={durationSeconds >= 900}>
+          +30s
+        </button>
       </div>
       <div className="timer-actions">
         <button onClick={() => setIsRunning((current) => !current)} disabled={isFinished}>
