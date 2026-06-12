@@ -182,11 +182,9 @@ def group_elements(slide, shps, x, y, w, h, name):
     return grp
 
 
-def add_arc(shapes, cx, cy, r, start_deg, end_deg, color=C_COURT, w=0.75):
-    """MSO ARC autoshape; angles (clockwise from 3 o'clock) set via avLst XML
-    because python-pptx exposes no adjustment spec for the arc preset."""
-    shp = shapes.add_shape(MSO_SHAPE.ARC,
-                           IN(cx - r), IN(cy - r), IN(2 * r), IN(2 * r))
+def set_adj_angles(shp, start_deg, end_deg):
+    """Set adj1/adj2 angle adjustments (clockwise from 3 o'clock) via avLst
+    XML — python-pptx exposes no adjustment spec for arc/pie/chord presets."""
     prst = shp._element.spPr.find(qn("a:prstGeom"))
     av = prst.find(qn("a:avLst"))
     if av is None:
@@ -199,6 +197,14 @@ def add_arc(shapes, cx, cy, r, start_deg, end_deg, color=C_COURT, w=0.75):
         gd = av.makeelement(qn("a:gd"), {"name": nm,
                                          "fmla": f"val {int(deg * 60000)}"})
         av.append(gd)
+    return shp
+
+
+def add_arc(shapes, cx, cy, r, start_deg, end_deg, color=C_COURT, w=0.75):
+    """MSO ARC autoshape with explicit start/end angles."""
+    shp = shapes.add_shape(MSO_SHAPE.ARC,
+                           IN(cx - r), IN(cy - r), IN(2 * r), IN(2 * r))
+    set_adj_angles(shp, start_deg, end_deg)
     shp.fill.background()
     shp.line.color.rgb = color
     shp.line.width = Pt(w)
@@ -594,61 +600,96 @@ def _marker(sh, x, y, fill, line, text, text_color, d=MARKER_D, dash=None):
     return m
 
 
-def draw_directional_marker(slide, x, y, fill, line_color, label,
-                             text_color, dash=None):
-    """
-    Circle + isosceles triangle above it, grouped as one object.
-    x,y = top-left of the bounding group.
-    Rotate the GROUP in PowerPoint to show any body orientation:
-      · right-click → Format Shape → Rotation
-      · or drag the circular rotation handle
-    The triangle always points where the player is facing.
-    """
-    d = MARKER_D
-    tri_h = round(d * 0.55, 5)    # 0.077" — visible but not bulky
-    tri_w = round(d * 0.70, 5)    # 0.098" — slightly narrower than circle
-    gap = round(d * 0.08, 5)      # 0.011" — tiny gap between triangle and circle
-
-    group_w = d                    # circle is wider; triangle centred within it
-    group_h = tri_h + gap + d
-
-    tri_x = x + (d - tri_w) / 2
-    tri_y = y
-    circle_x = x
-    circle_y = y + tri_h + gap
-
-    ind_fill = fill if fill not in (C_WHITE, None) else (line_color or C_DARK)
-
-    tri = add_box(slide.shapes, tri_x, tri_y, tri_w, tri_h,
-                  fill=ind_fill, line=None,
-                  shape=MSO_SHAPE.ISOSCELES_TRIANGLE)
-    circ = add_box(slide.shapes, circle_x, circle_y, d, d,
-                   fill=fill, line=line_color, line_w=1.0,
-                   shape=MSO_SHAPE.OVAL, dash=dash)
-    tf = circ.text_frame
+def _marker_text(shp, label, text_color, size=7, lift=0.0):
+    """lift > 0 nudges the centred text upward (extra bottom margin) —
+    used by the chord puck whose visual centre sits above its bbox centre."""
+    tf = shp.text_frame
     tf.word_wrap = False
-    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    tf.margin_left = tf.margin_right = tf.margin_top = 0
+    tf.margin_bottom = IN(lift)
     p = tf.paragraphs[0]
     p.alignment = PP_ALIGN.CENTER
     r = p.add_run()
     r.text = str(label)
-    r.font.name = FONT
-    r.font.size = Pt(7)
-    r.font.bold = True
-    r.font.color.rgb = text_color
+    f = r.font
+    f.name = FONT
+    f.size = Pt(size)
+    f.bold = True
+    f.color.rgb = text_color
+    return shp
 
-    return group_elements(slide, [tri, circ], x, y, group_w, group_h,
-                          f"dm_{label}")
+
+def draw_d_puck(sh, x, y, fill, line_color, label, text_color, dash=None):
+    """
+    Body-shape marker: a circle with a flattened back — the flat edge IS the
+    shoulder line, the curved edge is the chest. Default orientation faces UP.
+    A single CHORD autoshape: no grouping, rotates cleanly in one click, and
+    reads as open/closed body shape instantly at court scale.
+    """
+    d = MARKER_D
+    shp = sh.add_shape(MSO_SHAPE.CHORD, IN(x), IN(y), IN(d), IN(d))
+    # chord cut across the lower edge: keep the sweep from 150° -> 30°
+    # (through north), leaving a flat shoulder line at the back/south
+    set_adj_angles(shp, 150, 30)
+    if fill is None:
+        shp.fill.background()
+    else:
+        shp.fill.solid()
+        shp.fill.fore_color.rgb = fill
+    if line_color is None:
+        shp.line.fill.background()
+    else:
+        shp.line.color.rgb = line_color
+        shp.line.width = Pt(1.0)
+        if dash is not None:
+            shp.line.dash_style = dash
+    _no_shadow(shp)
+    return _marker_text(shp, label, text_color, lift=0.03)
+
+
+def draw_vision_marker(slide, x, y, fill, line_color, label, text_color,
+                       dash=None):
+    """
+    Player circle + translucent vision cone (70° wedge, default facing UP),
+    grouped as one object. Rotate the group to set body orientation — the
+    cone shows facing AND field of view. Placed on a defender it doubles as
+    a cover-shadow tool (the passing lanes the body blocks).
+    x, y = top-left of the player circle. Cone radius ~2.5x marker.
+    """
+    d = MARKER_D
+    cone_r = d * 1.75                  # wedge reach ≈ 4 m at court scale
+    ccx = x + d / 2.0                  # player centre
+    ccy = y + d / 2.0
+
+    pie = slide.shapes.add_shape(MSO_SHAPE.PIE,
+                                 IN(ccx - cone_r), IN(ccy - cone_r),
+                                 IN(2 * cone_r), IN(2 * cone_r))
+    set_adj_angles(pie, 235, 305)      # 70° wedge centred on north (270°)
+    pie.fill.solid()
+    cone_color = fill if fill not in (C_WHITE, None) else (line_color or C_DARK)
+    pie.fill.fore_color.rgb = cone_color
+    set_fill_alpha(pie, 20)
+    pie.line.fill.background()
+    _no_shadow(pie)
+
+    circ = add_box(slide.shapes, x, y, d, d, fill=fill, line=line_color,
+                   line_w=1.0, shape=MSO_SHAPE.OVAL, dash=dash)
+    _marker_text(circ, label, text_color)
+
+    return group_elements(slide, [pie, circ],
+                          ccx - cone_r, ccy - cone_r,
+                          2 * cone_r, 2 * cone_r, f"vm_{label}")
 
 
 def _lib_label(sh, x, y, w, text):
     add_text(sh, x, y, w, 0.18, [[(text, 6.5, False, C_MID)]],
-             align=PP_ALIGN.CENTER)
+             align=PP_ALIGN.CENTER, wrap=False)
 
 
 def _section_head(sh, x, y, text):
     add_box(sh, x, y + 0.03, 0.04, 0.16, fill=C_ACCENT, line=None)
-    add_text(sh, x + 0.08, y, 2.6, 0.22, [[(text, 9, True, C_DARK)]])
+    add_text(sh, x + 0.08, y, 2.6, 0.22, [[(text, 9, True, C_DARK)]],
+             wrap=False)
 
 
 def build_component_library(prs):
@@ -722,29 +763,45 @@ def build_component_library(prs):
 
     add_line(sh, MARGIN, 1.65, SLIDE_W - MARGIN, 1.65, C_LINE, 0.5)
 
-    # ── Row 2: directional markers ──────────────────────────────────────────
+    # ── Row 2: body shape & orientation ─────────────────────────────────────
     r2y = 1.72
-    _section_head(sh, 0.40, r2y,
-                  "DIRECTIONAL MARKERS  —  rotate the group to show body orientation")
+    _section_head(sh, 0.40, r2y, "BODY SHAPE  —  shoulder-line pucks")
 
-    dir_items = [
+    puck_items = [
         (C_ACCENT, None,  "A", C_WHITE, None,                   "Attacker"),
         (C_WHITE,  C_MID, "D", C_MID,  None,                   "Defender"),
         (C_DARK,   None,  "G", C_WHITE, None,                   "GK"),
         (C_WHITE,  C_MID, "N", C_MID,  MSO_LINE_DASH_STYLE.DASH, "Neutral"),
     ]
-    _tri_h = MARKER_D * 0.55
-    _gap   = MARKER_D * 0.08
-    _group_h = _tri_h + _gap + MARKER_D       # total directional group height
+    for i, (fill, line, t, tc, dash, lbl) in enumerate(puck_items):
+        mx = 0.47 + i * 0.50
+        draw_d_puck(sh, mx, r2y + 0.28, fill, line, t, tc, dash=dash)
+        _lib_label(sh, mx - 0.06, r2y + 0.46, 0.44, lbl)
 
-    for i, (fill, line, t, tc, dash, lbl) in enumerate(dir_items):
-        mx = 0.47 + i * 0.58
-        my = r2y + 0.27
-        draw_directional_marker(slide, mx, my, fill, line, t, tc, dash=dash)
-        _lib_label(sh, mx - 0.03, my + _group_h + 0.03, 0.44, lbl)
+    add_text(sh, 0.40, r2y + 0.66, 2.55, 0.36, [[
+        ("Flat edge = shoulders, curve = chest. One shape — rotate it to "
+         "show open / closed body shape.", 7.5, False, C_MID),
+    ]])
+
+    _section_head(sh, 3.30, r2y, "VISION CONE  —  facing + field of view")
+    cone_items = [
+        (C_ACCENT, None,  "A", C_WHITE, "Attacker"),
+        (C_WHITE,  C_MID, "D", C_MID,  "Defender"),
+        (C_DARK,   None,  "G", C_WHITE, "GK"),
+    ]
+    for i, (fill, line, t, tc, lbl) in enumerate(cone_items):
+        mx = 3.55 + i * 0.62
+        draw_vision_marker(slide, mx, r2y + 0.42, fill, line, t, tc)
+        _lib_label(sh, mx - 0.15, r2y + 0.60, 0.44, lbl)
+
+    add_text(sh, 3.30, r2y + 0.80, 2.85, 0.30, [[
+        ("Rotate the group: cone shows where the player faces and what "
+         "they see. On a defender it doubles as a cover shadow.",
+         7.5, False, C_MID),
+    ]])
 
     # rotation instruction callout
-    instr = add_box(sh, 3.05, r2y + 0.22, 4.50, 0.50,
+    instr = add_box(sh, 6.55, r2y + 0.24, 3.30, 0.62,
                     fill=C_FAINT, line=C_LINE, line_w=0.75)
     tf = instr.text_frame
     tf.word_wrap = True
@@ -752,15 +809,16 @@ def build_component_library(prs):
     tf.margin_top = IN(0.04); tf.margin_bottom = IN(0.04)
     p = tf.paragraphs[0]
     r = p.add_run()
-    r.text = ("HOW TO USE  ·  Select any directional marker → right-click → "
-              "Format Shape → Rotation.  Or drag the circular rotation handle "
-              "above the shape.  The triangle always points where the player faces.")
+    r.text = ("ROTATION  ·  All orientation markers face UP by default. "
+              "Select → drag the rotation handle, or Format Shape → "
+              "Rotation and type the angle (0 = up, 90 = right, "
+              "180 = down, 270 = left).")
     r.font.name = FONT; r.font.size = Pt(7.5); r.font.color.rgb = C_MID
 
-    add_line(sh, MARGIN, 2.58, SLIDE_W - MARGIN, 2.58, C_LINE, 0.5)
+    add_line(sh, MARGIN, 2.92, SLIDE_W - MARGIN, 2.92, C_LINE, 0.5)
 
-    # ── Row 3: Team A + Team B numbered sets ────────────────────────────────
-    r3y = 2.65
+    # ── Row 3: Team A + Team B numbered sets (body-shape pucks) ─────────────
+    r3y = 2.98
 
     # Team A (blue — your team)
     add_text(sh, 0.40, r3y, 2.4, 0.20, [[
@@ -768,8 +826,8 @@ def build_component_library(prs):
         ("your team", 7.5, False, C_MID),
     ]])
     for n in range(1, 6):
-        draw_directional_marker(slide, 0.40 + (n - 1) * 0.44, r3y + 0.24,
-                                C_ACCENT, None, str(n), C_WHITE)
+        draw_d_puck(sh, 0.45 + (n - 1) * 0.38, r3y + 0.24,
+                    C_ACCENT, None, str(n), C_WHITE)
 
     # Team B (dark — opposition)
     add_text(sh, 2.75, r3y, 3.0, 0.20, [[
@@ -777,16 +835,16 @@ def build_component_library(prs):
         ("opposition — change fill colour to match", 7.5, False, C_MID),
     ]])
     for n in range(1, 6):
-        draw_directional_marker(slide, 2.75 + (n - 1) * 0.44, r3y + 0.24,
-                                C_DARK, None, str(n), C_WHITE)
+        draw_d_puck(sh, 2.80 + (n - 1) * 0.38, r3y + 0.24,
+                    C_DARK, None, str(n), C_WHITE)
 
     # Scale note
-    add_text(sh, 5.20, r3y, 7.80, 0.70, [
+    add_text(sh, 5.50, r3y, 7.50, 0.55, [
         [("SCALE + COLOUR", 7, True, C_MID)],
-        [("Markers are shown at true court scale — copy directly onto a "
-          "diagram and they will be proportionally correct.  "
-          "To recolour Team B: select all 5 markers, right-click → "
-          "Format Shape → Fill → choose your opponent colour.", 8, False, C_DARK)],
+        [("Markers are at true court scale — copy straight onto a diagram. "
+          "Team pucks carry body shape too: rotate any puck to angle the "
+          "shoulders. To recolour Team B: select all 5 → Format Shape → "
+          "Fill.", 8, False, C_DARK)],
     ])
 
     add_line(sh, MARGIN, 3.58, SLIDE_W - MARGIN, 3.58, C_LINE, 0.5)
@@ -814,8 +872,8 @@ def build_component_library(prs):
     ])
 
     add_footer(slide, "COMPONENT LIBRARY  —  court-scale tactical symbols  ·  "
-                      "copy into any diagram zone  ·  directional markers: "
-                      "rotate to show body shape")
+                      "copy into any diagram zone  ·  pucks + vision cones: "
+                      "rotate to show body shape and field of view")
     return slide
 
 
