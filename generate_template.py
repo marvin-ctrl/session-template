@@ -654,11 +654,11 @@ def draw_vision_marker(slide, x, y, fill, line_color, label, text_color,
     grouped as one object. Rotate the group to set body orientation — the
     cone shows facing AND field of view. Placed on a defender it doubles as
     a cover-shadow tool (the passing lanes the body blocks).
-    x, y = top-left of the player circle. Cone radius ~2.5x marker.
+    x, y = top-left of the player circle. Cone radius ≈3 m at court scale.
     """
     d = MARKER_D
-    cone_r = d * 1.75                  # wedge reach ≈ 4 m at court scale
-    ccx = x + d / 2.0                  # player centre
+    cone_r = d * 1.75                  # ≈3 m at court scale
+    ccx = x + d / 2.0
     ccy = y + d / 2.0
 
     pie = slide.shapes.add_shape(MSO_SHAPE.PIE,
@@ -679,6 +679,102 @@ def draw_vision_marker(slide, x, y, fill, line_color, label, text_color,
     return group_elements(slide, [pie, circ],
                           ccx - cone_r, ccy - cone_r,
                           2 * cone_r, 2 * cone_r, f"vm_{label}")
+
+
+def draw_scan_zone(slide, x, y, fill, line_color, label, text_color,
+                   dash=None):
+    """
+    Player circle + scanning awareness arc (180° sweep, default facing UP),
+    grouped as one object. Represents the full area a player actively sweeps
+    before receiving — much larger than the vision cone (≈5.5 m vs ≈3 m).
+
+    SCAN ZONE:   180° sweep, dashed outline, 10% opacity — awareness
+    VISION CONE:  70° sweep, solid,          20% opacity — focus
+    BODY PUCK:    chord shape, no extra group — shoulder line
+
+    Rotate the group to reorient. Combine all three (draw_combined_awareness)
+    to show the full scanning picture on a single player.
+    """
+    d = MARKER_D
+    scan_r = d * 3.2                   # ≈5.5 m at court scale
+    ccx = x + d / 2.0
+    ccy = y + d / 2.0
+
+    scan_color = fill if fill not in (C_WHITE, None) else (line_color or C_DARK)
+    s_pie = slide.shapes.add_shape(MSO_SHAPE.PIE,
+                                   IN(ccx - scan_r), IN(ccy - scan_r),
+                                   IN(2 * scan_r), IN(2 * scan_r))
+    # 180° sweep from west (180°) clockwise through north (270°) to east (360°)
+    set_adj_angles(s_pie, 180, 360)
+    s_pie.fill.solid()
+    s_pie.fill.fore_color.rgb = scan_color
+    set_fill_alpha(s_pie, 10)
+    s_pie.line.color.rgb = scan_color
+    s_pie.line.width = Pt(1.0)
+    s_pie.line.dash_style = MSO_LINE_DASH_STYLE.DASH
+    _no_shadow(s_pie)
+
+    circ = add_box(slide.shapes, x, y, d, d, fill=fill, line=line_color,
+                   line_w=1.0, shape=MSO_SHAPE.OVAL, dash=dash)
+    _marker_text(circ, label, text_color)
+
+    return group_elements(slide, [s_pie, circ],
+                          ccx - scan_r, ccy - scan_r,
+                          2 * scan_r, 2 * scan_r, f"scan_{label}")
+
+
+def draw_combined_awareness(slide, x, y, fill, line_color, label, text_color):
+    """
+    All three awareness layers in one grouped element — the full scanning
+    picture for a single player:
+      outer arc   scanning zone (180°, dashed, 10% opacity, ≈5.5 m)
+      inner wedge vision cone   ( 70°, solid,  20% opacity, ≈3 m)
+      centre      body-shape puck
+    Rotate the whole group to reorient the player.
+    """
+    d = MARKER_D
+    scan_r = d * 3.2
+    cone_r = d * 1.75
+    ccx = x + d / 2.0
+    ccy = y + d / 2.0
+    scan_color = fill if fill not in (C_WHITE, None) else (line_color or C_DARK)
+
+    # layer 1: scan zone (bottom — largest, most transparent)
+    s_pie = slide.shapes.add_shape(MSO_SHAPE.PIE,
+                                   IN(ccx - scan_r), IN(ccy - scan_r),
+                                   IN(2 * scan_r), IN(2 * scan_r))
+    set_adj_angles(s_pie, 180, 360)
+    s_pie.fill.solid(); s_pie.fill.fore_color.rgb = scan_color
+    set_fill_alpha(s_pie, 10)
+    s_pie.line.color.rgb = scan_color
+    s_pie.line.width = Pt(1.0)
+    s_pie.line.dash_style = MSO_LINE_DASH_STYLE.DASH
+    _no_shadow(s_pie)
+
+    # layer 2: vision cone (mid — focused facing direction)
+    c_pie = slide.shapes.add_shape(MSO_SHAPE.PIE,
+                                   IN(ccx - cone_r), IN(ccy - cone_r),
+                                   IN(2 * cone_r), IN(2 * cone_r))
+    set_adj_angles(c_pie, 235, 305)
+    c_pie.fill.solid(); c_pie.fill.fore_color.rgb = scan_color
+    set_fill_alpha(c_pie, 22)
+    c_pie.line.fill.background()
+    _no_shadow(c_pie)
+
+    # layer 3: body-shape puck (top — shoulder line visible)
+    puck = slide.shapes.add_shape(MSO_SHAPE.CHORD, IN(x), IN(y), IN(d), IN(d))
+    set_adj_angles(puck, 150, 30)
+    puck.fill.solid(); puck.fill.fore_color.rgb = fill if fill is not None else scan_color
+    if line_color:
+        puck.line.color.rgb = line_color; puck.line.width = Pt(1.0)
+    else:
+        puck.line.fill.background()
+    _no_shadow(puck)
+    _marker_text(puck, label, text_color, lift=0.03)
+
+    return group_elements(slide, [s_pie, c_pie, puck],
+                          ccx - scan_r, ccy - scan_r,
+                          2 * scan_r, 2 * scan_r, f"combined_{label}")
 
 
 def _lib_label(sh, x, y, w, text):
@@ -817,63 +913,102 @@ def build_component_library(prs):
 
     add_line(sh, MARGIN, 2.92, SLIDE_W - MARGIN, 2.92, C_LINE, 0.5)
 
-    # ── Row 3: Team A + Team B numbered sets (body-shape pucks) ─────────────
-    r3y = 2.98
+    # ── Row 3: scanning awareness zone ──────────────────────────────────────
+    # Shapes drawn FIRST so header text renders on top (z-order)
+    r3y = 2.97
+    player_sy = r3y + 0.35             # player top; scan group top ≈ 2.95 ✓
 
-    # Team A (blue — your team)
-    add_text(sh, 0.40, r3y, 2.4, 0.20, [[
+    scan_items = [
+        (C_ACCENT, None,  "A", C_WHITE, "Attacker"),
+        (C_WHITE,  C_MID, "D", C_MID,  "Defender"),
+        (C_DARK,   None,  "G", C_WHITE, "GK"),
+    ]
+    _scan_r = MARKER_D * 3.2           # 0.448"
+    # standalone examples
+    for i, (fill, line, t, tc, lbl) in enumerate(scan_items):
+        px_ = 0.65 + i * 1.10
+        draw_scan_zone(slide, px_, player_sy, fill, line, t, tc)
+        _lib_label(sh, px_ - 0.08, player_sy + MARKER_D + 0.06, 0.50, lbl)
+
+    # combined: scan zone + vision cone + body puck in one group
+    comb_x = 4.08
+    draw_combined_awareness(slide, comb_x, player_sy, C_ACCENT, None, "A", C_WHITE)
+    _lib_label(sh, comb_x - 0.14, player_sy + MARKER_D + 0.06, 0.58, "Combined")
+
+    # section header drawn on top of the translucent zones
+    _section_head(sh, 0.40, r3y,
+                  "SCANNING AWARENESS ZONE  (180°, ≈5.5 m at court scale)")
+
+    # explanation (right of the examples)
+    add_text(sh, 5.05, r3y + 0.05, 7.90, 1.00, [
+        [("SCANNING AWARENESS  ·  VISION CONE  ·  BODY SHAPE", 8.5, True, C_DARK)],
+        [("Scan zone (180°, dashed, very light) = the full area a player "
+          "actively sweeps before receiving — peripheral awareness, "
+          "not just facing direction.", 8, False, C_MID)],
+        [("", 3, False, C_DARK)],
+        [("Vision cone (70°, solid) = immediate focus and field of view. "
+          "Scan zone + vision cone together show the difference between what "
+          "a player checks and what they commit to.", 8, False, C_MID)],
+        [("", 3, False, C_DARK)],
+        [("COMBINED example (left): all three layers in one group. "
+          "Rotate the whole group to orient the player. "
+          "Use standalone or combined — each is a separate object.",
+          8, False, C_DARK)],
+    ])
+
+    add_line(sh, MARGIN, 4.15, SLIDE_W - MARGIN, 4.15, C_LINE, 0.5)
+
+    # ── Row 4: Team A + Team B numbered sets ────────────────────────────────
+    r4y = 4.21
+
+    add_text(sh, 0.40, r4y, 2.4, 0.20, [[
         ("TEAM A  ", 8, True, C_ACCENT),
         ("your team", 7.5, False, C_MID),
     ]])
     for n in range(1, 6):
-        draw_d_puck(sh, 0.45 + (n - 1) * 0.38, r3y + 0.24,
+        draw_d_puck(sh, 0.45 + (n - 1) * 0.38, r4y + 0.24,
                     C_ACCENT, None, str(n), C_WHITE)
 
-    # Team B (dark — opposition)
-    add_text(sh, 2.75, r3y, 3.0, 0.20, [[
+    add_text(sh, 2.75, r4y, 3.0, 0.20, [[
         ("TEAM B  ", 8, True, C_DARK),
         ("opposition — change fill colour to match", 7.5, False, C_MID),
     ]])
     for n in range(1, 6):
-        draw_d_puck(sh, 2.80 + (n - 1) * 0.38, r3y + 0.24,
+        draw_d_puck(sh, 2.80 + (n - 1) * 0.38, r4y + 0.24,
                     C_DARK, None, str(n), C_WHITE)
 
-    # Scale note
-    add_text(sh, 5.50, r3y, 7.50, 0.55, [
+    add_text(sh, 5.50, r4y, 7.50, 0.55, [
         [("SCALE + COLOUR", 7, True, C_MID)],
-        [("Markers are at true court scale — copy straight onto a diagram. "
-          "Team pucks carry body shape too: rotate any puck to angle the "
-          "shoulders. To recolour Team B: select all 5 → Format Shape → "
-          "Fill.", 8, False, C_DARK)],
+        [("Markers are at true court scale. Team pucks carry body shape: "
+          "rotate any puck to angle the shoulders. "
+          "To recolour Team B: select all 5 → Format Shape → Fill.",
+          8, False, C_DARK)],
     ])
 
-    add_line(sh, MARGIN, 3.58, SLIDE_W - MARGIN, 3.58, C_LINE, 0.5)
+    add_line(sh, MARGIN, 4.85, SLIDE_W - MARGIN, 4.85, C_LINE, 0.5)
 
-    # ── Row 4: courts ───────────────────────────────────────────────────────
-    cy0 = 3.65
+    # ── Row 5: courts ───────────────────────────────────────────────────────
+    cy0 = 4.92
     _section_head(sh, 0.40, cy0, "FULL COURT  (40m × 20m)")
-    draw_futsal_court(slide, 0.55, cy0 + 0.32, 4.40, "Library full court")
-    _section_head(sh, 6.20, cy0, "HALF COURT  (20m × 20m)")
-    draw_futsal_half_court(slide, 6.35, cy0 + 0.32, 2.20,
+    draw_futsal_court(slide, 0.55, cy0 + 0.28, 3.80, "Library full court")
+    _section_head(sh, 5.60, cy0, "HALF COURT  (20m × 20m)")
+    draw_futsal_half_court(slide, 5.75, cy0 + 0.28, 1.90,
                            "Library half court")
 
-    add_text(sh, 9.65, cy0 + 0.32, 3.30, 3.20, [
+    add_text(sh, 8.10, cy0 + 0.28, 4.85, 2.00, [
         [("USAGE", 7, True, C_MID)],
         [("Courts are grouped — one click selects the whole court. "
-          "Copy and paste onto any diagram, then resize to fit. "
+          "Copy and paste into any diagram zone, resize to fit. "
           "Ungroup (Ctrl+Shift+G) to edit individual markings.", 8, False, C_DARK)],
-        [("", 4, False, C_DARK)],
-        [("To change the accent colour on a slide: select all blue shapes "
-          "(click one, then Edit → Select All Same Fill Colour) and choose "
+        [("", 3, False, C_DARK)],
+        [("All shapes are unlocked. Numbers inside markers are editable — "
+          "double-click to change. To recolour: select shapes → "
           "Format Shape → Fill.", 8, False, C_DARK)],
-        [("", 4, False, C_DARK)],
-        [("All shapes are unlocked. Numbers inside markers are "
-          "editable text — double-click to change.", 8, False, C_DARK)],
     ])
 
     add_footer(slide, "COMPONENT LIBRARY  —  court-scale tactical symbols  ·  "
-                      "copy into any diagram zone  ·  pucks + vision cones: "
-                      "rotate to show body shape and field of view")
+                      "scan zone (180°, 5.5 m) · vision cone (70°, 3 m) · "
+                      "body puck · rotate to orient · combined group available")
     return slide
 
 
