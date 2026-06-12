@@ -6,10 +6,13 @@ Generates `futsal_session_template.pptx`: a fully editable, premium,
 one-page session-plan template system for national-team futsal staff.
 
 Slides:
-  1. Master template      (keep clean, duplicate weekly)
-  2. Working copy         (identical, ready to fill)
-  3. Annotated guide      (same layout + deletable "HOW TO" callouts)
-  4. Component library    (reusable futsal tactical symbols + courts)
+  1. Master template       (keep clean, duplicate weekly)
+  2. Working copy          (identical, ready to fill)
+  3. Annotated guide       (same layout + deletable "HOW TO" callouts)
+  4. Component library     (reusable futsal tactical symbols + courts)
+  5. Session control board (time, load, tactical balance, rotations,
+                            review loop — the session as an instrument)
+  6. On-court cards        (print, cut, pocket — arm's-length cue cards)
 
 Everything is native PowerPoint vector shapes / text boxes / tables.
 No images, no locked elements, no hidden masking shapes.
@@ -1051,6 +1054,313 @@ def build_component_library(prs):
     return slide
 
 
+# ---------------------------------------------------------------- session control board
+#
+# No session plan in any sport shows TIME, LOAD, BALANCE and the REVIEW
+# LOOP on one surface. This board does. It treats the session as an
+# instrument, not a document:
+#
+#   1. TEMPO & LOAD TIMELINE  — width = minutes; a draggable intensity
+#      curve built from diamond nodes wired to live connectors (drag a
+#      node, the curve follows — native PowerPoint behaviour).
+#   2. GAME-MOMENT FINGERPRINT — futsal's four moments + set plays vs
+#      each activity. The session's tactical balance, visible at arm's
+#      length before a single cone goes down.
+#   3. ROTATION BOARD          — who is in which team per block.
+#   4. REVIEW LOOP + AUDIT     — closed before leaving the hall; the
+#      carry-forward seeds next week's session theme.
+
+def _slide_masthead(slide, title, subtitle):
+    add_text(slide.shapes, MARGIN, 0.05, 12.9, 0.50, [
+        [(title, 16, True, C_DARK)],
+        [(subtitle, 8.5, False, C_MID)],
+    ])
+    add_box(slide.shapes, 0, HEADER_H, SLIDE_W, RULE_H,
+            fill=C_ACCENT, line=None)
+
+
+def _field_box(sh, x, y, w, h, label, value="[   ]"):
+    add_box(sh, x, y, w, h, fill=C_WHITE, line=C_LINE, line_w=0.75)
+    add_text(sh, x + 0.04, y + 0.02, w - 0.08, 0.16,
+             [[(label, 6.5, True, C_MID)]], wrap=False)
+    add_text(sh, x + 0.04, y + h - 0.30, w - 0.08, 0.26,
+             [[(value, 11, True, C_DARK)]])
+
+
+def build_control_board(prs):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    sh = slide.shapes
+
+    _slide_masthead(
+        slide, "SESSION CONTROL BOARD",
+        "The session as an instrument, not a document — time, load, "
+        "tactical balance, rotations and the review loop on one surface. "
+        "Plan it here, audit it here, seed next week here.")
+
+    # ── Band A: tempo & load timeline ───────────────────────────────────────
+    _section_head(sh, 0.40, 0.68, "TEMPO + LOAD TIMELINE  (width = time)")
+    add_text(sh, 4.10, 0.66, 8.95, 0.40, [[
+        ("Bars are minutes — drag a bar edge to your real timings. "
+         "Diamonds = planned intensity: drag one and the curve stays "
+         "attached. After the session, copy the diamonds, recolour grey, "
+         "set actual — instant planned vs actual.", 7.5, False, C_MID),
+    ]])
+
+    PLOT_X, PLOT_R, TOTAL_MIN = 1.10, 12.95, 90
+    PLOT_W = PLOT_R - PLOT_X
+
+    def TX(m):                       # session minute -> x
+        return PLOT_X + m * (PLOT_W / TOTAL_MIN)
+
+    def TY(rpe):                     # RPE 1-5 -> y
+        return 2.12 - (rpe - 1) * 0.25
+
+    # intensity grid
+    for r in range(1, 6):
+        add_line(sh, PLOT_X, TY(r), PLOT_R, TY(r), C_LINE, 0.5)
+        add_text(sh, 0.55, TY(r) - 0.08, 0.50, 0.16,
+                 [[(f"RPE {r}", 6, False, C_MID)]],
+                 align=PP_ALIGN.RIGHT, wrap=False)
+
+    # activity duration bars (proportional defaults — coach drags edges)
+    bar_y, bar_h = 2.30, 0.28
+    blocks_t = [(0, 15, "01  WARM UP · 15'"),
+                (20, 20, "02  TECHNICAL · 20'"),
+                (45, 20, "03  TACTICAL · 20'"),
+                (70, 20, "04  GAME · 20'")]
+    for start, mins, lbl in blocks_t:
+        bar = add_box(sh, TX(start), bar_y, TX(start + mins) - TX(start),
+                      bar_h, fill=C_ACCENT, line=C_ACCENT, line_w=0.75)
+        set_fill_alpha(bar, 15)
+        add_text(sh, TX(start) + 0.02, bar_y + 0.055,
+                 TX(start + mins) - TX(start) - 0.04, 0.18,
+                 [[(lbl, 7, True, C_DARK)]], wrap=False)
+    for start, end in ((15, 20), (40, 45), (65, 70)):     # rest gaps
+        add_box(sh, TX(start), bar_y, TX(end) - TX(start), bar_h,
+                fill=C_LITE, line=None)
+        add_text(sh, TX(start), bar_y + 0.055, TX(end) - TX(start), 0.18,
+                 [[("R", 6.5, True, C_MID)]], align=PP_ALIGN.CENTER,
+                 wrap=False)
+
+    # minute axis: 5-min minor ticks, 15-min labelled
+    ax_y = bar_y + bar_h
+    for m in range(0, TOTAL_MIN + 1, 5):
+        major = m % 15 == 0
+        add_line(sh, TX(m), ax_y, TX(m), ax_y + (0.05 if major else 0.03),
+                 C_MID if major else C_LINE, 0.5)
+        if major:
+            add_text(sh, TX(m) - 0.20, ax_y + 0.05, 0.40, 0.14,
+                     [[(str(m), 6, False, C_MID)]],
+                     align=PP_ALIGN.CENTER, wrap=False)
+
+    # intensity curve: diamond nodes + connectors that stay attached
+    nodes_def = [(0, 2), (15, 3), (20, 2.5), (40, 4),
+                 (45, 3.5), (65, 4.5), (70, 4), (90, 5)]
+    nd = 0.12
+    nodes = []
+    for m, rpe in nodes_def:
+        node = add_box(sh, TX(m) - nd / 2, TY(rpe) - nd / 2, nd, nd,
+                       fill=C_ACCENT, line=None, shape=MSO_SHAPE.DIAMOND)
+        nodes.append(node)
+    for a, b in zip(nodes, nodes[1:]):
+        seg = add_line(sh, 0, 0, 1, 1, C_ACCENT, 1.5)
+        seg.begin_connect(a, 3)      # right vertex of left node
+        seg.end_connect(b, 1)        # left vertex of right node
+
+    add_line(sh, MARGIN, 2.88, SLIDE_W - MARGIN, 2.88, C_LINE, 0.5)
+
+    # ── Band B left: game-moment fingerprint ────────────────────────────────
+    _section_head(sh, 0.40, 2.98, "GAME-MOMENT FINGERPRINT")
+    add_text(sh, 0.42, 3.18, 4.40, 0.16, [[
+        ("Where does this session actually live? Fill before you coach.",
+         7, False, C_MID)]], wrap=False)
+
+    moments = ("ATT ORG", "DEF ORG", "ATT→DEF", "DEF→ATT", "SET PLAY")
+    col_x0, col_w = 1.62, 0.64
+    for c, mom in enumerate(moments):
+        add_text(sh, col_x0 + c * col_w, 3.40, col_w, 0.14,
+                 [[(mom, 6, True, C_MID)]], align=PP_ALIGN.CENTER,
+                 wrap=False)
+    fp_rows = ("01  WARM UP", "02  TECHNICAL", "03  TACTICAL", "04  GAME")
+    sq = 0.28
+    for r_i, lbl in enumerate(fp_rows):
+        ry = 3.60 + r_i * 0.38
+        add_text(sh, 0.42, ry + 0.04, 1.18, 0.18,
+                 [[(lbl, 7.5, True, C_DARK)]], wrap=False)
+        for c in range(5):
+            add_box(sh, col_x0 + c * col_w + (col_w - sq) / 2, ry,
+                    sq, sq, fill=C_WHITE, line=C_LINE, line_w=0.75)
+    tot_y = 3.60 + 4 * 0.38 + 0.04
+    add_text(sh, 0.42, tot_y + 0.02, 1.18, 0.18,
+             [[("MINUTES", 7, True, C_MID)]], wrap=False)
+    for c in range(5):
+        add_text(sh, col_x0 + c * col_w, tot_y, col_w, 0.20,
+                 [[("[  ]", 8, True, C_DARK)]], align=PP_ALIGN.CENTER,
+                 wrap=False)
+    leg_y = tot_y + 0.30
+    lsq = add_box(sh, 0.42, leg_y, 0.14, 0.14, fill=C_ACCENT, line=None)
+    add_text(sh, 0.60, leg_y - 0.02, 1.10, 0.18,
+             [[("PRIMARY", 6.5, False, C_MID)]], wrap=False)
+    add_box(sh, 1.40, leg_y, 0.14, 0.14, fill=C_LITE, line=C_LINE,
+            line_w=0.75)
+    add_text(sh, 1.58, leg_y - 0.02, 3.30, 0.18,
+             [[("SECONDARY  ·  click a square → Fill to mark",
+                6.5, False, C_MID)]], wrap=False)
+
+    # ── Band B middle: rotation board ───────────────────────────────────────
+    _section_head(sh, 5.15, 2.98, "ROTATION BOARD")
+    add_text(sh, 5.17, 3.18, 3.30, 0.16, [[
+        ("A / B = team   N = neutral   G = GK   R = rest",
+         7, False, C_MID)]], wrap=False)
+
+    positions = (["GK"] * 2 + ["FIXO"] * 3 + ["ALA"] * 6 + ["PIVOT"] * 3)
+    rrows = 1 + len(positions)
+    rt_y, rt_h = 3.44, 3.30
+    gframe = sh.add_table(rrows, 6, IN(5.15), IN(rt_y), IN(3.30), IN(rt_h))
+    tbl = gframe.table
+    tbl.first_row = False
+    tbl.horz_banding = False
+    tblPr = tbl._tbl.tblPr
+    for el in tblPr.findall(qn("a:tableStyleId")):
+        tblPr.remove(el)
+    tsid = tblPr.makeelement(qn("a:tableStyleId"), {})
+    tsid.text = "{2D5ABB26-0587-4C30-8999-92F81FD0307C}"
+    tblPr.append(tsid)
+    for c, cw in enumerate((0.42, 1.04, 0.46, 0.46, 0.46, 0.46)):
+        tbl.columns[c].width = IN(cw)
+    row_h = IN(rt_h / rrows)
+    for r in tbl.rows:
+        r.height = row_h
+    for c, head in enumerate(("POS", "PLAYER", "01", "02", "03", "04")):
+        _style_cell(tbl.cell(0, c), head, 6.5, True, C_DARK, C_LITE,
+                    align=PP_ALIGN.CENTER if c >= 2 else PP_ALIGN.LEFT)
+    for i, pos in enumerate(positions, start=1):
+        tint = C_FAINT if pos in ("FIXO", "PIVOT") else C_WHITE
+        _style_cell(tbl.cell(i, 0), pos, 6.5, True, C_DARK, tint)
+        _style_cell(tbl.cell(i, 1), "[Player]", 6.5, False, C_MID, tint)
+        for c in range(2, 6):
+            _style_cell(tbl.cell(i, c), "", 6.5, True, C_DARK, tint,
+                        align=PP_ALIGN.CENTER)
+    add_text(sh, 5.15, 7.06, 3.30, 0.20, [[
+        ("Empty cells are visible before the session — nobody hides.",
+         6.5, False, C_MID)]], wrap=False)
+
+    # ── Band B right: review loop ───────────────────────────────────────────
+    _section_head(sh, 8.75, 2.98, "REVIEW LOOP  —  close it in the hall")
+    loop_items = [
+        ("WHAT WORKED", "[Insert — be specific]", C_LINE),
+        ("WHAT TO CHANGE", "[Insert — one constraint to adjust]", C_LINE),
+        ("CARRY FORWARD → NEXT SESSION", "[Insert — paste into next "
+         "week's SESSION THEME]", C_ACCENT),
+    ]
+    ly = 3.28
+    for label, value, edge in loop_items:
+        add_box(sh, 8.75, ly, 4.20, 0.60, fill=C_WHITE, line=edge,
+                line_w=1.0)
+        add_text(sh, 8.81, ly + 0.04, 4.08, 0.50, [
+            [(label, 7, True, C_ACCENT if edge is C_ACCENT else C_MID)],
+            [(value, 8, False, C_DARK)],
+        ])
+        if edge is not C_ACCENT:
+            add_arrowhead(add_line(sh, 10.85, ly + 0.60, 10.85, ly + 0.72,
+                                   C_MID, 1.0))
+        ly += 0.72
+
+    # ── Band C left: session audit ──────────────────────────────────────────
+    _section_head(sh, 0.40, 5.62, "SESSION AUDIT  —  the numbers nobody tracks")
+    audit = (("BALL-ROLLING TIME  (%)", 0.42, 5.92),
+             ("COACH TALK TIME  (min)", 2.68, 5.92),
+             ("PLANNED AVG INTENSITY", 0.42, 6.56),
+             ("ACTUAL AVG INTENSITY", 2.68, 6.56))
+    for label, fx, fy in audit:
+        _field_box(sh, fx, fy, 2.16, 0.56, label)
+
+    # ── Band C right: next session seed ─────────────────────────────────────
+    _section_head(sh, 8.75, 5.62, "NEXT SESSION SEED  —  first three decisions")
+    for i in range(3):
+        sy = 5.92 + i * 0.42
+        add_text(sh, 8.78, sy, 4.17, 0.30, [[
+            (f"{i + 1}   ", 10, True, C_ACCENT),
+            ("[Insert decision]", 8.5, False, C_DARK),
+        ]])
+        add_line(sh, 8.78, sy + 0.32, 12.95, sy + 0.32, C_LINE, 0.5)
+
+    add_footer(slide, "SESSION CONTROL BOARD  —  width = time · drag "
+                      "intensity diamonds, the curve follows · fingerprint "
+                      "shows tactical balance · review loop seeds next week")
+    return slide
+
+
+# ---------------------------------------------------------------- on-court cards
+
+def build_oncourt_cards(prs):
+    """Print → cut along the dashed lines → pocket. Four cards, one per
+    block, in session order — type sized to read at arm's length in a
+    loud hall, mid-session, without a clipboard."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    sh = slide.shapes
+
+    _slide_masthead(
+        slide, "ON-COURT CARDS",
+        "Print this slide, cut along the dashed lines: four pocket cards, "
+        "one per block, in session order. Three cues maximum per card — "
+        "if it needs more words, it belongs on the plan, not on court.")
+
+    cards = ((0.30, 0.85, "01", "WARM UP"),
+             (7.00, 0.85, "02", "TECHNICAL / POSSESSION"),
+             (0.30, 4.15, "03", "TACTICAL ACTIVITY"),
+             (7.00, 4.15, "04", "GAME"))
+    cw, ch = 6.10, 3.05
+
+    for cx, cy, num, title in cards:
+        add_box(sh, cx, cy, cw, ch, fill=C_WHITE, line=C_LINE, line_w=1.0)
+        add_box(sh, cx, cy, 0.07, ch, fill=C_ACCENT, line=None)
+        add_text(sh, cx + 0.15, cy + 0.06, 0.75, 0.50,
+                 [[(num, 26, True, C_ACCENT)]], wrap=False)
+        add_text(sh, cx + 0.90, cy + 0.20, 3.55, 0.32,
+                 [[(title, 14, True, C_DARK)]], wrap=False)
+        chip = add_box(sh, cx + 4.60, cy + 0.16, 1.32, 0.38,
+                       fill=C_WHITE, line=C_ACCENT, line_w=1.25,
+                       shape=MSO_SHAPE.ROUNDED_RECTANGLE)
+        _marker_text(chip, "[Insert mins]", C_ACCENT, size=10)
+        add_text(sh, cx + 0.20, cy + 0.66, 1.20, 0.18,
+                 [[("CUES", 7.5, True, C_MID)]], wrap=False)
+        for i in range(3):
+            qy = cy + 0.88 + i * 0.40
+            add_text(sh, cx + 0.20, qy, 3.60, 0.34, [[
+                (f"{i + 1}  ", 13, True, C_ACCENT),
+                ("[Insert cue — five words max]", 12, True, C_DARK),
+            ]], wrap=False)
+        draw_futsal_court(slide, cx + 3.95, cy + 0.95, 1.90,
+                          f"Card court {num}")
+        add_line(sh, cx + 0.20, cy + 2.32, cx + cw - 0.15, cy + 2.32,
+                 C_LINE, 0.5)
+        add_text(sh, cx + 0.20, cy + 2.40, 3.90, 0.55, [[
+            ("WATCH FOR   ", 7.5, True, C_MID),
+            ("[Insert the trigger that makes you stop play]",
+             9.5, False, C_DARK),
+        ]])
+        add_text(sh, cx + 4.30, cy + 2.40, 1.65, 0.30, [[
+            ("WORK : REST   ", 7.5, True, C_MID),
+            ("[   ]", 9.5, True, C_DARK),
+        ]], align=PP_ALIGN.RIGHT, wrap=False)
+
+    # cut guides
+    add_line(sh, 6.70, 0.78, 6.70, 7.28, C_MID, 0.75,
+             dash=MSO_LINE_DASH_STYLE.DASH)
+    add_line(sh, 0.20, 4.025, 13.13, 4.025, C_MID, 0.75,
+             dash=MSO_LINE_DASH_STYLE.DASH)
+    add_text(sh, 6.46, 0.60, 0.50, 0.16, [[("CUT", 6, True, C_MID)]],
+             align=PP_ALIGN.CENTER, wrap=False)
+    add_text(sh, 13.00, 3.93, 0.34, 0.16, [[("CUT", 6, True, C_MID)]],
+             wrap=False)
+
+    add_footer(slide, "ON-COURT CARDS  —  print · cut · pocket  ·  one "
+                      "card per block  ·  three cues max  ·  readable at "
+                      "arm's length")
+    return slide
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -1068,6 +1378,8 @@ def main():
                         "notes after reading")
     add_annotations(guide)
     build_component_library(prs)
+    build_control_board(prs)
+    build_oncourt_cards(prs)
 
     out = "futsal_session_template.pptx"
     prs.save(out)
