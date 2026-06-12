@@ -777,6 +777,29 @@ def draw_combined_awareness(slide, x, y, fill, line_color, label, text_color):
                           2 * scan_r, 2 * scan_r, f"combined_{label}")
 
 
+def draw_long_cone(slide, apex_x, apex_y, color, name):
+    """
+    Standalone LONG vision cone — no player attached. A single 70° PIE
+    wedge, default facing UP with the apex at the player's position.
+    ≈8 m at court scale (vs ≈3 m on the attached cone) — a true sight
+    line across the court. Drop it under any existing marker, rotate to
+    aim, drag a corner handle to lengthen or shorten.
+    """
+    r = MARKER_D * 4.66                # ≈8 m at court scale
+    pie = slide.shapes.add_shape(MSO_SHAPE.PIE,
+                                 IN(apex_x - r), IN(apex_y - r),
+                                 IN(2 * r), IN(2 * r))
+    set_adj_angles(pie, 235, 305)      # 70° wedge centred on north (270°)
+    pie.fill.solid()
+    pie.fill.fore_color.rgb = color
+    set_fill_alpha(pie, 20)
+    pie.line.color.rgb = color
+    pie.line.width = Pt(0.75)
+    _no_shadow(pie)
+    pie.name = name
+    return pie
+
+
 def _lib_label(sh, x, y, w, text):
     add_text(sh, x, y, w, 0.18, [[(text, 6.5, False, C_MID)]],
              align=PP_ALIGN.CENTER, wrap=False)
@@ -911,6 +934,21 @@ def build_component_library(prs):
               "180 = down, 270 = left).")
     r.font.name = FONT; r.font.size = Pt(7.5); r.font.color.rgb = C_MID
 
+    add_text(sh, 6.55, r2y + 0.90, 3.30, 0.30, [[
+        ("LONG CONES (right) are separate — no player attached. Drop one "
+         "under any marker, rotate to aim, drag a corner handle to "
+         "lengthen.", 7.5, False, C_MID),
+    ]])
+
+    # LONG VISION CONES — standalone sight lines, drawn before the header
+    # so the header text renders on top of the translucent wedges
+    long_items = [(C_ACCENT, "Attacker"), (C_MID, "Defender"), (C_DARK, "GK")]
+    for i, (color, lbl) in enumerate(long_items):
+        ax = 10.55 + i * 1.05
+        draw_long_cone(slide, ax, r2y + 0.95, color, f"Long cone {lbl}")
+        _lib_label(sh, ax - 0.30, r2y + 0.99, 0.60, lbl)
+    _section_head(sh, 10.00, r2y, "LONG VISION CONES  (≈8 m, standalone)")
+
     add_line(sh, MARGIN, 2.92, SLIDE_W - MARGIN, 2.92, C_LINE, 0.5)
 
     # ── Row 3: scanning awareness zone ──────────────────────────────────────
@@ -1008,7 +1046,8 @@ def build_component_library(prs):
 
     add_footer(slide, "COMPONENT LIBRARY  —  court-scale tactical symbols  ·  "
                       "scan zone (180°, 5.5 m) · vision cone (70°, 3 m) · "
-                      "body puck · rotate to orient · combined group available")
+                      "long cone (8 m, standalone) · body puck · "
+                      "rotate to orient · combined group available")
     return slide
 
 
