@@ -53,6 +53,11 @@ C_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
 FONT = "Calibri"
 
+# Court-scale marker size.
+# On a 3.26" wide court (=40m), 1m = 0.0815".
+# 0.14" ≈ 1.7 m — standard for elite coaching diagrams.
+MARKER_D = 0.14
+
 # page geometry (all inches; arithmetic validated to sum exactly)
 MARGIN = 0.15
 HEADER_H = 0.55
@@ -568,8 +573,9 @@ def add_annotations(slide):
 
 # ---------------------------------------------------------------- component library
 
-def _marker(sh, x, y, fill, line, text, text_color, d=0.26, dash=None):
-    m = add_box(sh, x, y, d, d, fill=fill, line=line, line_w=1.25,
+def _marker(sh, x, y, fill, line, text, text_color, d=MARKER_D, dash=None):
+    """Plain (non-directional) player circle. d defaults to court-scale size."""
+    m = add_box(sh, x, y, d, d, fill=fill, line=line, line_w=1.0,
                 shape=MSO_SHAPE.OVAL, dash=dash)
     tf = m.text_frame
     tf.word_wrap = False
@@ -582,10 +588,57 @@ def _marker(sh, x, y, fill, line, text, text_color, d=0.26, dash=None):
     r = p.add_run()
     r.text = text
     r.font.name = FONT
-    r.font.size = Pt(9)
+    r.font.size = Pt(7)
     r.font.bold = True
     r.font.color.rgb = text_color
     return m
+
+
+def draw_directional_marker(slide, x, y, fill, line_color, label,
+                             text_color, dash=None):
+    """
+    Circle + isosceles triangle above it, grouped as one object.
+    x,y = top-left of the bounding group.
+    Rotate the GROUP in PowerPoint to show any body orientation:
+      · right-click → Format Shape → Rotation
+      · or drag the circular rotation handle
+    The triangle always points where the player is facing.
+    """
+    d = MARKER_D
+    tri_h = round(d * 0.55, 5)    # 0.077" — visible but not bulky
+    tri_w = round(d * 0.70, 5)    # 0.098" — slightly narrower than circle
+    gap = round(d * 0.08, 5)      # 0.011" — tiny gap between triangle and circle
+
+    group_w = d                    # circle is wider; triangle centred within it
+    group_h = tri_h + gap + d
+
+    tri_x = x + (d - tri_w) / 2
+    tri_y = y
+    circle_x = x
+    circle_y = y + tri_h + gap
+
+    ind_fill = fill if fill not in (C_WHITE, None) else (line_color or C_DARK)
+
+    tri = add_box(slide.shapes, tri_x, tri_y, tri_w, tri_h,
+                  fill=ind_fill, line=None,
+                  shape=MSO_SHAPE.ISOSCELES_TRIANGLE)
+    circ = add_box(slide.shapes, circle_x, circle_y, d, d,
+                   fill=fill, line=line_color, line_w=1.0,
+                   shape=MSO_SHAPE.OVAL, dash=dash)
+    tf = circ.text_frame
+    tf.word_wrap = False
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    r = p.add_run()
+    r.text = str(label)
+    r.font.name = FONT
+    r.font.size = Pt(7)
+    r.font.bold = True
+    r.font.color.rgb = text_color
+
+    return group_elements(slide, [tri, circ], x, y, group_w, group_h,
+                          f"dm_{label}")
 
 
 def _lib_label(sh, x, y, w, text):
@@ -602,83 +655,167 @@ def build_component_library(prs):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     sh = slide.shapes
 
-    add_text(sh, MARGIN, 0.05, 9.0, 0.50, [
+    add_text(sh, MARGIN, 0.05, 10.0, 0.50, [
         [("COMPONENT LIBRARY", 16, True, C_DARK)],
-        [("Copy any element into a diagram zone. Consistent sizes and "
-          "line weights — duplicate freely.", 8.5, False, C_MID)],
+        [("All markers are at true court scale (≈1.7 m on a 40 m court). "
+          "Copy and paste directly onto any diagram — they will be "
+          "proportionally correct.", 8.5, False, C_MID)],
     ])
     add_box(sh, 0, HEADER_H, SLIDE_W, RULE_H, fill=C_ACCENT, line=None)
 
-    # --- players -----------------------------------------------------------
-    px, py = 0.40, 0.95
-    _section_head(sh, px, py, "PLAYERS")
-    items = [
-        (C_ACCENT, None, "1", C_WHITE, None, "Attacker"),
-        (C_WHITE, C_MID, "1", C_MID, None, "Defender"),
-        (C_DARK, None, "G", C_WHITE, None, "GK"),
-        (C_WHITE, C_MID, "N", C_MID, MSO_LINE_DASH_STYLE.DASH, "Neutral"),
+    # ── Row 1: plain markers | equipment | lines | zones ────────────────────
+    r1y = 0.72
+
+    # PLAIN PLAYER MARKERS (no direction indicator — for quick annotation)
+    px, py = 0.40, r1y
+    _section_head(sh, px, py, "PLAYER MARKERS  (plain)")
+    plain = [
+        (C_ACCENT, None,  "A", C_WHITE, None,                   "Attacker"),
+        (C_WHITE,  C_MID, "D", C_MID,  None,                   "Defender"),
+        (C_DARK,   None,  "G", C_WHITE, None,                   "GK"),
+        (C_WHITE,  C_MID, "N", C_MID,  MSO_LINE_DASH_STYLE.DASH, "Neutral"),
     ]
-    for i, (fill, line, t, tc, dash, lbl) in enumerate(items):
-        ix = px + i * 0.72
-        _marker(sh, ix + 0.14, py + 0.32, fill, line, t, tc, dash=dash)
-        _lib_label(sh, ix, py + 0.62, 0.70, lbl)
+    for i, (fill, line, t, tc, dash, lbl) in enumerate(plain):
+        mx = px + 0.06 + i * 0.50
+        _marker(sh, mx, py + 0.26, fill, line, t, tc, dash=dash)
+        _lib_label(sh, mx - 0.04, py + 0.44, 0.44, lbl)
 
-    # --- equipment ----------------------------------------------------------
-    ex, ey = 3.55, 0.95
+    # EQUIPMENT (court-scale)
+    ex, ey = 2.55, r1y
     _section_head(sh, ex, ey, "EQUIPMENT")
-    add_box(sh, ex + 0.10, ey + 0.34, 0.22, 0.20, fill=C_MID, line=None,
+    # Cone ≈1.1 m tall
+    add_box(sh, ex + 0.08, ey + 0.28, 0.09, 0.08, fill=C_MID, line=None,
             shape=MSO_SHAPE.ISOSCELES_TRIANGLE)
-    _lib_label(sh, ex - 0.10, ey + 0.62, 0.62, "Cone")
-    add_box(sh, ex + 0.78, ey + 0.28, 0.05, 0.32, fill=C_MID, line=None)
-    _lib_label(sh, ex + 0.50, ey + 0.62, 0.62, "Pole")
-    add_box(sh, ex + 1.34, ey + 0.38, 0.13, 0.13, fill=C_DARK, line=None,
+    _lib_label(sh, ex + 0.01, ey + 0.44, 0.40, "Cone")
+    # Pole ≈0.5 m wide × 2.5 m tall
+    add_box(sh, ex + 0.62, ey + 0.24, 0.04, 0.20, fill=C_MID, line=None)
+    _lib_label(sh, ex + 0.47, ey + 0.44, 0.40, "Pole")
+    # Ball ≈0.85 m
+    add_box(sh, ex + 1.10, ey + 0.30, 0.07, 0.07, fill=C_DARK, line=None,
             shape=MSO_SHAPE.OVAL)
-    _lib_label(sh, ex + 1.10, ey + 0.62, 0.62, "Ball")
+    _lib_label(sh, ex + 0.95, ey + 0.44, 0.40, "Ball")
 
-    # --- movement lines ------------------------------------------------------
-    lx, ly = 5.85, 0.95
+    # LINES
+    lx, ly = 3.75, r1y
     _section_head(sh, lx, ly, "LINES")
-    add_arrowhead(add_line(sh, lx + 0.05, ly + 0.42, lx + 0.95, ly + 0.42,
-                           C_DARK, 1.5))
-    _lib_label(sh, lx, ly + 0.50, 1.00, "Movement run")
-    add_arrowhead(add_line(sh, lx + 1.15, ly + 0.42, lx + 2.05, ly + 0.42,
+    add_arrowhead(add_line(sh, lx + 0.05, ly + 0.38,
+                           lx + 0.80, ly + 0.38, C_DARK, 1.5))
+    _lib_label(sh, lx, ly + 0.44, 0.90, "Run")
+    add_arrowhead(add_line(sh, lx + 1.00, ly + 0.38,
+                           lx + 1.75, ly + 0.38,
                            C_DARK, 1.5, dash=MSO_LINE_DASH_STYLE.DASH))
-    _lib_label(sh, lx + 1.10, ly + 0.50, 1.00, "Pass")
-    add_arrowhead(add_line(sh, lx + 2.25, ly + 0.42, lx + 3.15, ly + 0.42,
+    _lib_label(sh, lx + 0.95, ly + 0.44, 0.90, "Pass")
+    add_arrowhead(add_line(sh, lx + 1.95, ly + 0.38,
+                           lx + 2.70, ly + 0.38,
                            C_DARK, 1.5, dash=MSO_LINE_DASH_STYLE.ROUND_DOT))
-    _lib_label(sh, lx + 2.20, ly + 0.50, 1.00, "Dribble")
+    _lib_label(sh, lx + 1.90, ly + 0.44, 0.90, "Dribble")
 
-    # --- zones & screens ------------------------------------------------------
-    zx, zy = 9.65, 0.95
+    # ZONES & SCREENS
+    zx, zy = 7.05, r1y
     _section_head(sh, zx, zy, "ZONES / SCREENS")
-    zone = add_box(sh, zx + 0.05, zy + 0.30, 0.85, 0.40,
-                   fill=C_ACCENT, line=None)
+    zone = add_box(sh, zx + 0.05, zy + 0.26, 0.70, 0.24, fill=C_ACCENT, line=None)
     set_fill_alpha(zone, 18)
-    _lib_label(sh, zx, zy + 0.72, 0.95, "Shaded zone")
-    add_box(sh, zx + 1.20, zy + 0.46, 0.45, 0.07, fill=C_DARK, line=None,
+    _lib_label(sh, zx + 0.02, zy + 0.44, 0.76, "Zone")
+    add_box(sh, zx + 1.00, zy + 0.34, 0.36, 0.06, fill=C_DARK, line=None,
             shape=MSO_SHAPE.ROUNDED_RECTANGLE)
-    _lib_label(sh, zx + 1.05, zy + 0.72, 0.80, "Screen / block")
+    _lib_label(sh, zx + 0.88, zy + 0.44, 0.62, "Screen")
 
-    # --- courts ---------------------------------------------------------------
-    cy0 = 2.30
-    _section_head(sh, 0.40, cy0, "FULL COURT  (40m x 20m)")
-    draw_futsal_court(slide, 0.55, cy0 + 0.35, 4.40, "Library full court")
-    _section_head(sh, 6.20, cy0, "HALF COURT  (20m x 20m)")
-    draw_futsal_half_court(slide, 6.35, cy0 + 0.35, 2.20,
-                           "Library half court")
+    add_line(sh, MARGIN, 1.65, SLIDE_W - MARGIN, 1.65, C_LINE, 0.5)
 
-    add_text(sh, 9.65, cy0 + 0.35, 3.30, 2.30, [
-        [("USAGE", 7, True, C_MID)],
-        [("Courts are grouped — copy a whole court in one click, or "
-          "ungroup to edit lines.", 8, False, C_DARK)],
-        [("", 4, False, C_DARK)],
-        [("Markers, lines and zones are single objects. Copy, paste and "
-          "drag onto any diagram. Numbers inside markers are editable "
-          "text.", 8, False, C_DARK)],
+    # ── Row 2: directional markers ──────────────────────────────────────────
+    r2y = 1.72
+    _section_head(sh, 0.40, r2y,
+                  "DIRECTIONAL MARKERS  —  rotate the group to show body orientation")
+
+    dir_items = [
+        (C_ACCENT, None,  "A", C_WHITE, None,                   "Attacker"),
+        (C_WHITE,  C_MID, "D", C_MID,  None,                   "Defender"),
+        (C_DARK,   None,  "G", C_WHITE, None,                   "GK"),
+        (C_WHITE,  C_MID, "N", C_MID,  MSO_LINE_DASH_STYLE.DASH, "Neutral"),
+    ]
+    _tri_h = MARKER_D * 0.55
+    _gap   = MARKER_D * 0.08
+    _group_h = _tri_h + _gap + MARKER_D       # total directional group height
+
+    for i, (fill, line, t, tc, dash, lbl) in enumerate(dir_items):
+        mx = 0.47 + i * 0.58
+        my = r2y + 0.27
+        draw_directional_marker(slide, mx, my, fill, line, t, tc, dash=dash)
+        _lib_label(sh, mx - 0.03, my + _group_h + 0.03, 0.44, lbl)
+
+    # rotation instruction callout
+    instr = add_box(sh, 3.05, r2y + 0.22, 4.50, 0.50,
+                    fill=C_FAINT, line=C_LINE, line_w=0.75)
+    tf = instr.text_frame
+    tf.word_wrap = True
+    tf.margin_left = IN(0.06); tf.margin_right = IN(0.06)
+    tf.margin_top = IN(0.04); tf.margin_bottom = IN(0.04)
+    p = tf.paragraphs[0]
+    r = p.add_run()
+    r.text = ("HOW TO USE  ·  Select any directional marker → right-click → "
+              "Format Shape → Rotation.  Or drag the circular rotation handle "
+              "above the shape.  The triangle always points where the player faces.")
+    r.font.name = FONT; r.font.size = Pt(7.5); r.font.color.rgb = C_MID
+
+    add_line(sh, MARGIN, 2.58, SLIDE_W - MARGIN, 2.58, C_LINE, 0.5)
+
+    # ── Row 3: Team A + Team B numbered sets ────────────────────────────────
+    r3y = 2.65
+
+    # Team A (blue — your team)
+    add_text(sh, 0.40, r3y, 2.4, 0.20, [[
+        ("TEAM A  ", 8, True, C_ACCENT),
+        ("your team", 7.5, False, C_MID),
+    ]])
+    for n in range(1, 6):
+        draw_directional_marker(slide, 0.40 + (n - 1) * 0.44, r3y + 0.24,
+                                C_ACCENT, None, str(n), C_WHITE)
+
+    # Team B (dark — opposition)
+    add_text(sh, 2.75, r3y, 3.0, 0.20, [[
+        ("TEAM B  ", 8, True, C_DARK),
+        ("opposition — change fill colour to match", 7.5, False, C_MID),
+    ]])
+    for n in range(1, 6):
+        draw_directional_marker(slide, 2.75 + (n - 1) * 0.44, r3y + 0.24,
+                                C_DARK, None, str(n), C_WHITE)
+
+    # Scale note
+    add_text(sh, 5.20, r3y, 7.80, 0.70, [
+        [("SCALE + COLOUR", 7, True, C_MID)],
+        [("Markers are shown at true court scale — copy directly onto a "
+          "diagram and they will be proportionally correct.  "
+          "To recolour Team B: select all 5 markers, right-click → "
+          "Format Shape → Fill → choose your opponent colour.", 8, False, C_DARK)],
     ])
 
-    add_footer(slide, "COMPONENT LIBRARY  —  futsal tactical symbols  ·  "
-                      "copy into any diagram zone")
+    add_line(sh, MARGIN, 3.58, SLIDE_W - MARGIN, 3.58, C_LINE, 0.5)
+
+    # ── Row 4: courts ───────────────────────────────────────────────────────
+    cy0 = 3.65
+    _section_head(sh, 0.40, cy0, "FULL COURT  (40m × 20m)")
+    draw_futsal_court(slide, 0.55, cy0 + 0.32, 4.40, "Library full court")
+    _section_head(sh, 6.20, cy0, "HALF COURT  (20m × 20m)")
+    draw_futsal_half_court(slide, 6.35, cy0 + 0.32, 2.20,
+                           "Library half court")
+
+    add_text(sh, 9.65, cy0 + 0.32, 3.30, 3.20, [
+        [("USAGE", 7, True, C_MID)],
+        [("Courts are grouped — one click selects the whole court. "
+          "Copy and paste onto any diagram, then resize to fit. "
+          "Ungroup (Ctrl+Shift+G) to edit individual markings.", 8, False, C_DARK)],
+        [("", 4, False, C_DARK)],
+        [("To change the accent colour on a slide: select all blue shapes "
+          "(click one, then Edit → Select All Same Fill Colour) and choose "
+          "Format Shape → Fill.", 8, False, C_DARK)],
+        [("", 4, False, C_DARK)],
+        [("All shapes are unlocked. Numbers inside markers are "
+          "editable text — double-click to change.", 8, False, C_DARK)],
+    ])
+
+    add_footer(slide, "COMPONENT LIBRARY  —  court-scale tactical symbols  ·  "
+                      "copy into any diagram zone  ·  directional markers: "
+                      "rotate to show body shape")
     return slide
 
 
