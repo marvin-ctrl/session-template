@@ -588,11 +588,11 @@ def add_annotations(slide):
          "HOW TO — Copy players, arrows and zones from Slide 4 "
          "(Component Library) onto the court."),
         (0.55, 5.20, 2.55, 0.62,
-         "HOW TO — Use the notes strip for constraints, progressions "
-         "and setup / equipment reminders."),
+         "HOW TO — Setup on the left. Pre-commit the harder and the "
+         "easier version of every activity before you coach it."),
         (5.90, 5.20, 2.55, 0.62,
-         "HOW TO — Duplicate Slide 2 each week. Delete these blue "
-         "notes — they are single text boxes."),
+         "HOW TO — Duplicate Slide 2 weekly. Slide 5 = load + rotations, "
+         "6 = set pieces, 7 = pocket cards. Delete these blue notes."),
         (10.93, 3.30, 2.15, 0.80,
          "HOW TO — Update counts, names and status here for fast late "
          "changes. Tab moves between table cells."),
@@ -850,7 +850,9 @@ def _section_head(sh, x, y, text, w=None):
     auto-grow and re-centre, which drags long titles left of the tick."""
     add_box(sh, x, y + 0.03, 0.04, 0.16, fill=C_ACCENT, line=None)
     if w is None:
-        w = min(4.80, SLIDE_W - MARGIN - x - 0.08)
+        # size the frame to the title (~0.078"/char at 9pt bold caps) so
+        # neighbouring heads never share a click target
+        w = min(len(text) * 0.078 + 0.25, SLIDE_W - MARGIN - x - 0.08)
     add_text(sh, x + 0.08, y, w, 0.22, [[(text, 9, True, C_DARK)]])
 
 
@@ -899,7 +901,7 @@ def build_component_library(prs):
     _lib_label(sh, ex + 0.95, ey + 0.44, 0.40, "Ball")
 
     # LINES
-    lx, ly = 3.75, r1y
+    lx, ly = 3.92, r1y
     _section_head(sh, lx, ly, "LINES")
     add_arrowhead(add_line(sh, lx + 0.05, ly + 0.38,
                            lx + 0.80, ly + 0.38, C_DARK, 1.5))
@@ -1042,7 +1044,7 @@ def build_component_library(prs):
     # ── Row 4: Team A + Team B numbered sets ────────────────────────────────
     r4y = 4.21
 
-    add_text(sh, 0.40, r4y, 2.4, 0.20, [[
+    add_text(sh, 0.40, r4y, 2.30, 0.20, [[
         ("TEAM A  ", 8, True, C_ACCENT),
         ("your team", 7.5, False, C_MID),
     ]])
@@ -1050,7 +1052,7 @@ def build_component_library(prs):
         draw_d_puck(sh, 0.45 + (n - 1) * 0.38, r4y + 0.24,
                     C_ACCENT, None, str(n), C_WHITE)
 
-    add_text(sh, 2.75, r4y, 3.0, 0.20, [[
+    add_text(sh, 2.75, r4y, 2.60, 0.20, [[
         ("TEAM B  ", 8, True, C_TEAMB),
         ("opposition", 7.5, False, C_MID),
     ]])
@@ -1229,7 +1231,7 @@ def build_control_board(prs):
 
     # ── Band B left: game-moment fingerprint ────────────────────────────────
     _section_head(sh, 0.40, 2.98, "GAME-MOMENT FINGERPRINT")
-    add_text(sh, 0.42, 3.18, 4.40, 0.16, [[
+    add_text(sh, 0.42, 3.21, 4.40, 0.16, [[
         ("Where does this session actually live? Fill before you coach.",
          7, False, C_MID)]], wrap=False)
 
@@ -1257,7 +1259,7 @@ def build_control_board(prs):
                  wrap=False)
     leg_y = tot_y + 0.30
     lsq = add_box(sh, 0.42, leg_y, 0.14, 0.14, fill=C_ACCENT, line=None)
-    add_text(sh, 0.60, leg_y - 0.02, 1.10, 0.18,
+    add_text(sh, 0.60, leg_y - 0.02, 0.75, 0.18,
              [[("PRIMARY", 6.5, False, C_MID)]], wrap=False)
     add_box(sh, 1.40, leg_y, 0.14, 0.14, fill=C_LITE, line=C_LINE,
             line_w=0.75)
@@ -1267,7 +1269,7 @@ def build_control_board(prs):
 
     # ── Band B middle: rotation board ───────────────────────────────────────
     _section_head(sh, 5.15, 2.98, "ROTATION BOARD")
-    add_text(sh, 5.17, 3.17, 3.30, 0.30, [
+    add_text(sh, 5.17, 3.21, 3.30, 0.30, [
         [("A / B = team   N = neutral   G = GK   R = rest",
           7, False, C_MID)],
         [("Empty cells show up before the session — nobody hides.",
