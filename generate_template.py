@@ -12,7 +12,13 @@ Slides:
   4. Component library     (reusable futsal tactical symbols + courts)
   5. Session control board (time, load, tactical balance, rotations,
                             review loop — the session as an instrument)
-  6. On-court cards        (print, cut, pocket — arm's-length cue cards)
+  6. Set pieces            (futsal's own restarts: kick-in, corner, goal
+                            clearance, powerplay 4v3, accumulated foul)
+  7. On-court cards        (print, cut, pocket — arm's-length cue cards)
+
+Colour is theme-driven: the three identity colours live in the presentation
+theme as accent1/2/3, so Design -> Variants -> Colours recolours every
+slide at once (accent1 = your team, accent2 = opposition, accent3 = court).
 
 Everything is native PowerPoint vector shapes / text boxes / tables.
 No images, no locked elements, no hidden masking shapes.
@@ -52,9 +58,28 @@ C_FAINT = RGBColor(0xFA, 0xFA, 0xFA)   # subtle row tint
 C_LINE = RGBColor(0xD9, 0xD9, 0xD9)    # hairline dividers
 C_ACCENT = RGBColor(0x00, 0x57, 0xB8)  # single accent (hierarchy only)
 C_COURT = RGBColor(0xA9, 0xB1, 0xBB)   # court line grey
+C_TEAMB = RGBColor(0x2F, 0x3B, 0x46)   # opposition / Team B identity
 C_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
 FONT = "Calibri"
+
+# ---------------------------------------------------------------- theme colours
+#
+# The three identity colours are written into the presentation THEME and
+# referenced from every shape as <a:schemeClr>, not <a:srgbClr>. That makes
+# the whole system recolourable in one move: Design -> Variants -> Colours
+# (or Slide Master -> Colours -> Customise) restyles all seven slides at
+# once to a national team's palette. Text greys stay fixed srgb on purpose —
+# body copy should not shift when the team colour changes.
+#
+#   accent1  team / primary accent   (block numbers, chips, attackers)
+#   accent2  opposition / Team B
+#   accent3  court line grey
+THEME_MAP = {
+    "0057B8": "accent1",
+    "2F3B46": "accent2",
+    "A9B1BB": "accent3",
+}
 
 # Court-scale marker size.
 # On a 3.26" wide court (=40m), 1m = 0.0815".
@@ -410,14 +435,25 @@ def draw_activity_block(slide, x, y, number, title):
         [("[Insert coaching points]", 8, False, C_DARK)],
     ])
 
-    # notes strip
+    # bottom strip: setup + the two adjustments, pre-committed.
+    # Splitting progression from regression is deliberate — the most common
+    # in-session failure is an activity pitched wrong with no planned move
+    # either way. Both directions get decided at the desk, not on the court.
     notes_y = main_y + main_h + 0.02
     notes_h = y + h - notes_y - 0.04
     add_line(sh, x + 0.07, notes_y, x + w - 0.07, notes_y, C_LINE, 0.75)
-    add_text(sh, x + 0.07, notes_y + 0.02, w - 0.14, notes_h, [[
-        ("NOTES / CONSTRAINTS / PROGRESSIONS   ", 7, True, C_MID),
-        ("[Insert notes]", 8, False, C_DARK),
-    ]])
+    cols = [
+        (x + 0.07, 2.28, "SETUP / CONSTRAINTS", "[Insert setup]", C_MID),
+        (x + 2.44, 1.30, "PROGRESSION  ↑", "[Harder]", C_ACCENT),
+        (x + 3.86, 1.32, "REGRESSION  ↓", "[Easier]", C_MID),
+    ]
+    for cx, cw, label, value, lcol in cols:
+        add_text(sh, cx, notes_y + 0.02, cw, notes_h - 0.04, [
+            [(label, 6.5, True, lcol)],
+            [(value, 8, False, C_DARK)],
+        ])
+    for dx in (x + 2.36, x + 3.78):
+        add_line(sh, dx, notes_y + 0.05, dx, y + h - 0.06, C_LINE, 0.5)
 
 
 def _style_cell(cell, text, size, bold, color, fill, align=PP_ALIGN.LEFT):
@@ -808,10 +844,14 @@ def _lib_label(sh, x, y, w, text):
              align=PP_ALIGN.CENTER, wrap=False)
 
 
-def _section_head(sh, x, y, text):
+def _section_head(sh, x, y, text, w=None):
+    """Accent tick + title. The box is sized wide enough that the title
+    never wraps; word_wrap stays ON because a no-wrap frame is free to
+    auto-grow and re-centre, which drags long titles left of the tick."""
     add_box(sh, x, y + 0.03, 0.04, 0.16, fill=C_ACCENT, line=None)
-    add_text(sh, x + 0.08, y, 2.6, 0.22, [[(text, 9, True, C_DARK)]],
-             wrap=False)
+    if w is None:
+        w = min(4.80, SLIDE_W - MARGIN - x - 0.08)
+    add_text(sh, x + 0.08, y, w, 0.22, [[(text, 9, True, C_DARK)]])
 
 
 def build_component_library(prs):
@@ -1011,19 +1051,21 @@ def build_component_library(prs):
                     C_ACCENT, None, str(n), C_WHITE)
 
     add_text(sh, 2.75, r4y, 3.0, 0.20, [[
-        ("TEAM B  ", 8, True, C_DARK),
-        ("opposition — change fill colour to match", 7.5, False, C_MID),
+        ("TEAM B  ", 8, True, C_TEAMB),
+        ("opposition", 7.5, False, C_MID),
     ]])
     for n in range(1, 6):
         draw_d_puck(sh, 2.80 + (n - 1) * 0.38, r4y + 0.24,
-                    C_DARK, None, str(n), C_WHITE)
+                    C_TEAMB, None, str(n), C_WHITE)
 
-    add_text(sh, 5.50, r4y, 7.50, 0.55, [
-        [("SCALE + COLOUR", 7, True, C_MID)],
-        [("Markers are at true court scale. Team pucks carry body shape: "
-          "rotate any puck to angle the shoulders. "
-          "To recolour Team B: select all 5 → Format Shape → Fill.",
-          8, False, C_DARK)],
+    add_text(sh, 5.50, r4y, 7.50, 0.60, [
+        [("ONE-CLICK RECOLOUR  —  the whole system is theme-driven",
+          7, True, C_ACCENT)],
+        [("Design → Variants → Colours → Customise. "
+          "Accent 1 = your team, Accent 2 = opposition, "
+          "Accent 3 = court lines. Changing one value restyles every "
+          "slide at once — no selecting shapes. Body text stays black "
+          "on purpose.", 8, False, C_DARK)],
     ])
 
     add_line(sh, MARGIN, 4.85, SLIDE_W - MARGIN, 4.85, C_LINE, 0.5)
@@ -1070,13 +1112,28 @@ def build_component_library(prs):
 #   4. REVIEW LOOP + AUDIT     — closed before leaving the hall; the
 #      carry-forward seeds next week's session theme.
 
-def _slide_masthead(slide, title, subtitle):
-    add_text(slide.shapes, MARGIN, 0.05, 12.9, 0.50, [
+def _slide_masthead(slide, title, subtitle, w=12.9):
+    add_text(slide.shapes, MARGIN, 0.05, w, 0.50, [
         [(title, 16, True, C_DARK)],
         [(subtitle, 8.5, False, C_MID)],
     ])
     add_box(slide.shapes, 0, HEADER_H, SLIDE_W, RULE_H,
             fill=C_ACCENT, line=None)
+
+
+def _microcycle_strip(sh, x, y):
+    """Camp/microcycle position — a national team never plans a session in
+    isolation, it plans a day inside a camp. Fill the day you are on."""
+    add_text(sh, x, y, 2.30, 0.16,
+             [[("MICROCYCLE  —  where this session sits", 6.5, True, C_MID)]],
+             wrap=False)
+    days = ("MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1")
+    cw = 0.60
+    for i, d in enumerate(days):
+        chip = add_box(sh, x + i * (cw + 0.04), y + 0.18, cw, 0.22,
+                       fill=C_WHITE, line=C_LINE, line_w=0.75,
+                       shape=MSO_SHAPE.ROUNDED_RECTANGLE)
+        _marker_text(chip, d, C_MID, size=7)
 
 
 def _field_box(sh, x, y, w, h, label, value="[   ]"):
@@ -1093,9 +1150,10 @@ def build_control_board(prs):
 
     _slide_masthead(
         slide, "SESSION CONTROL BOARD",
-        "The session as an instrument, not a document — time, load, "
-        "tactical balance, rotations and the review loop on one surface. "
-        "Plan it here, audit it here, seed next week here.")
+        "Time, load, tactical balance, rotations and the review loop on "
+        "one surface. Plan it here, audit it here, seed next week here.",
+        w=8.70)
+    _microcycle_strip(sh, 9.10, 0.10)
 
     # ── Band A: tempo & load timeline ───────────────────────────────────────
     _section_head(sh, 0.40, 0.68, "TEMPO + LOAD TIMELINE  (width = time)")
@@ -1209,41 +1267,60 @@ def build_control_board(prs):
 
     # ── Band B middle: rotation board ───────────────────────────────────────
     _section_head(sh, 5.15, 2.98, "ROTATION BOARD")
-    add_text(sh, 5.17, 3.18, 3.30, 0.16, [[
-        ("A / B = team   N = neutral   G = GK   R = rest",
-         7, False, C_MID)]], wrap=False)
+    add_text(sh, 5.17, 3.17, 3.30, 0.30, [
+        [("A / B = team   N = neutral   G = GK   R = rest",
+          7, False, C_MID)],
+        [("Empty cells show up before the session — nobody hides.",
+          6.5, False, C_MID)],
+    ])
 
+    # Two seven-player tables side by side rather than one column of
+    # fourteen: the whole squad stays on the board, the rows stay tall
+    # enough to write a letter into, and tab still walks the cells.
+    # Shirt numbers key back to the squad panel on the session slide.
     positions = (["GK"] * 2 + ["FIXO"] * 3 + ["ALA"] * 6 + ["PIVOT"] * 3)
-    rrows = 1 + len(positions)
-    rt_y, rt_h = 3.44, 3.30
-    gframe = sh.add_table(rrows, 6, IN(5.15), IN(rt_y), IN(3.30), IN(rt_h))
-    tbl = gframe.table
-    tbl.first_row = False
-    tbl.horz_banding = False
-    tblPr = tbl._tbl.tblPr
-    for el in tblPr.findall(qn("a:tableStyleId")):
-        tblPr.remove(el)
-    tsid = tblPr.makeelement(qn("a:tableStyleId"), {})
-    tsid.text = "{2D5ABB26-0587-4C30-8999-92F81FD0307C}"
-    tblPr.append(tsid)
-    for c, cw in enumerate((0.42, 1.04, 0.46, 0.46, 0.46, 0.46)):
-        tbl.columns[c].width = IN(cw)
-    row_h = IN(rt_h / rrows)
-    for r in tbl.rows:
-        r.height = row_h
-    for c, head in enumerate(("POS", "PLAYER", "01", "02", "03", "04")):
-        _style_cell(tbl.cell(0, c), head, 6.5, True, C_DARK, C_LITE,
-                    align=PP_ALIGN.CENTER if c >= 2 else PP_ALIGN.LEFT)
-    for i, pos in enumerate(positions, start=1):
-        tint = C_FAINT if pos in ("FIXO", "PIVOT") else C_WHITE
-        _style_cell(tbl.cell(i, 0), pos, 6.5, True, C_DARK, tint)
-        _style_cell(tbl.cell(i, 1), "[Player]", 6.5, False, C_MID, tint)
-        for c in range(2, 6):
-            _style_cell(tbl.cell(i, c), "", 6.5, True, C_DARK, tint,
-                        align=PP_ALIGN.CENTER)
-    add_text(sh, 5.15, 7.06, 3.30, 0.20, [[
-        ("Empty cells are visible before the session — nobody hides.",
-         6.5, False, C_MID)]], wrap=False)
+    halves = (positions[:7], positions[7:])
+    rt_y = 3.52
+    rows_per = 1 + 7
+    row_h = 0.31                       # honoured by PowerPoint and LibreOffice
+    tbl_w = 1.62
+    for half_i, half in enumerate(halves):
+        tx = 5.15 + half_i * (tbl_w + 0.06)
+        gframe = sh.add_table(rows_per, 6, IN(tx), IN(rt_y),
+                              IN(tbl_w), IN(rows_per * row_h))
+        tbl = gframe.table
+        tbl.first_row = False
+        tbl.horz_banding = False
+        tblPr = tbl._tbl.tblPr
+        for el in tblPr.findall(qn("a:tableStyleId")):
+            tblPr.remove(el)
+        tsid = tblPr.makeelement(qn("a:tableStyleId"), {})
+        tsid.text = "{2D5ABB26-0587-4C30-8999-92F81FD0307C}"
+        tblPr.append(tsid)
+        for c, cw in enumerate((0.40, 0.26, 0.24, 0.24, 0.24, 0.24)):
+            tbl.columns[c].width = IN(cw)
+        for r in tbl.rows:
+            r.height = IN(row_h)
+        for c, head in enumerate(("POS", "#", "01", "02", "03", "04")):
+            _style_cell(tbl.cell(0, c), head, 6.5, True, C_DARK, C_LITE,
+                        align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.CENTER)
+        for i, pos in enumerate(half, start=1):
+            tint = C_FAINT if pos in ("FIXO", "PIVOT") else C_WHITE
+            _style_cell(tbl.cell(i, 0), pos, 6.5, True, C_DARK, tint)
+            for c in range(1, 6):
+                _style_cell(tbl.cell(i, c), "", 7, True, C_DARK, tint,
+                            align=PP_ALIGN.CENTER)
+
+    # availability — the other half of team selection
+    av_y = rt_y + rows_per * row_h + 0.14
+    _section_head(sh, 5.15, av_y, "UNAVAILABLE / MODIFIED")
+    add_box(sh, 5.17, av_y + 0.26, 3.28, 0.74, fill=C_WHITE, line=C_LINE,
+            line_w=0.75)
+    add_text(sh, 5.23, av_y + 0.30, 3.16, 0.66, [
+        [("INJURED / LOAD-MANAGED / RETURNING", 6.5, True, C_MID)],
+        [("[Insert player + what they can and cannot do]",
+          8, False, C_DARK)],
+    ])
 
     # ── Band B right: review loop ───────────────────────────────────────────
     _section_head(sh, 8.75, 2.98, "REVIEW LOOP  —  close it in the hall")
@@ -1268,12 +1345,22 @@ def build_control_board(prs):
 
     # ── Band C left: session audit ──────────────────────────────────────────
     _section_head(sh, 0.40, 5.62, "SESSION AUDIT  —  the numbers nobody tracks")
-    audit = (("BALL-ROLLING TIME  (%)", 0.42, 5.92),
-             ("COACH TALK TIME  (min)", 2.68, 5.92),
-             ("PLANNED AVG INTENSITY", 0.42, 6.56),
-             ("ACTUAL AVG INTENSITY", 2.68, 6.56))
-    for label, fx, fy in audit:
-        _field_box(sh, fx, fy, 2.16, 0.56, label)
+    audit = ("BALL-ROLLING %", "TALK TIME (min)",
+             "PLANNED RPE", "ACTUAL RPE")
+    for i, label in enumerate(audit):
+        _field_box(sh, 0.42 + i * 1.10, 5.92, 1.04, 0.52, label)
+
+    # kit list — the session fails in the car park, not on the court
+    _section_head(sh, 0.40, 6.54, "KIT + SETUP  —  check before you leave")
+    add_box(sh, 0.42, 6.82, 4.34, 0.44, fill=C_WHITE, line=C_LINE,
+            line_w=0.75)
+    add_text(sh, 0.48, 6.88, 4.22, 0.34, [[
+        ("BALLS ", 6.5, True, C_MID), ("[  ]   ", 8.5, True, C_DARK),
+        ("BIBS ", 6.5, True, C_MID), ("[  ]   ", 8.5, True, C_DARK),
+        ("CONES ", 6.5, True, C_MID), ("[  ]   ", 8.5, True, C_DARK),
+        ("GOALS ", 6.5, True, C_MID), ("[  ]   ", 8.5, True, C_DARK),
+        ("GK KIT ", 6.5, True, C_MID), ("[  ]", 8.5, True, C_DARK),
+    ]])
 
     # ── Band C right: next session seed ─────────────────────────────────────
     _section_head(sh, 8.75, 5.62, "NEXT SESSION SEED  —  first three decisions")
@@ -1288,6 +1375,106 @@ def build_control_board(prs):
     add_footer(slide, "SESSION CONTROL BOARD  —  width = time · drag "
                       "intensity diamonds, the curve follows · fingerprint "
                       "shows tactical balance · review loop seeds next week")
+    return slide
+
+
+# ---------------------------------------------------------------- set pieces
+#
+# The situations on this board are futsal's own — they have no football
+# equivalent, and a national team rehearses every one of them each camp:
+#   kick-in            no throw-in exists; 4 seconds to restart
+#   corner             4 seconds, dead-ball from the corner
+#   goal clearance     GK throws, ball must leave the penalty area
+#   powerplay 4v3      flying goalkeeper joins the attack
+#   defending powerplay  4v3 down, protecting an empty net
+#   accumulated foul   6th team foul onward = free shot from 10 m
+# No session-plan template covers them. This one does, with a court each.
+
+SET_PIECES = [
+    ("01", "KICK-IN  —  ATTACKING",
+     "Ball out of play at the touchline", "4s to restart"),
+    ("02", "CORNER  —  ATTACKING",
+     "Corner awarded", "4s to restart"),
+    ("03", "GOAL CLEARANCE  —  BUILD OUT",
+     "GK has the ball in hand", "Must leave the area"),
+    ("04", "POWERPLAY  4v3  —  FLYING GK",
+     "Chasing the game / GK pushes on", "Keep the ball moving"),
+    ("05", "DEFENDING POWERPLAY  —  4v3 DOWN",
+     "Opponent commits their GK", "Protect an empty net"),
+    ("06", "ACCUMULATED FOUL  —  10 m",
+     "6th team foul onward", "Free shot, no wall"),
+]
+
+
+def build_set_pieces(prs):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    sh = slide.shapes
+
+    _slide_masthead(
+        slide, "SET PIECES + SPECIAL SITUATIONS",
+        "Futsal's own restarts and phases — a court each, with the "
+        "trigger, the five roles and the call. Rehearse these every camp; "
+        "they decide tight games.")
+
+    pw, ph = 4.29, 3.15
+    gap_x, gap_y = 0.08, 0.10
+    for i, (num, name, trigger, rule) in enumerate(SET_PIECES):
+        px = MARGIN + (i % 3) * (pw + gap_x)
+        py = 0.68 + (i // 3) * (ph + gap_y)
+
+        add_box(sh, px, py, pw, ph, fill=C_WHITE, line=C_LINE, line_w=0.75)
+        # title bar
+        add_box(sh, px, py, pw, 0.30, fill=C_LITE, line=None)
+        add_box(sh, px, py, 0.05, 0.30, fill=C_ACCENT, line=None)
+        add_text(sh, px + 0.09, py + 0.035, 0.34, 0.24,
+                 [[(num, 11, True, C_ACCENT)]], wrap=False)
+        add_text(sh, px + 0.45, py + 0.055, pw - 0.52, 0.22,
+                 [[(name, 8.5, True, C_DARK)]], wrap=False)
+
+        # court (half court = 20 x 20 m, the set-piece working area)
+        court_w = 1.98
+        draw_futsal_half_court(slide, px + 0.15, py + 0.40, court_w,
+                               f"Set piece court {num}")
+
+        # right column: rule chip, trigger, five roles
+        rx = px + 2.26
+        rw = pw - 2.26 - 0.10
+        chip = add_box(sh, rx, py + 0.40, rw, 0.22, fill=C_WHITE,
+                       line=C_ACCENT, line_w=1.0,
+                       shape=MSO_SHAPE.ROUNDED_RECTANGLE)
+        _marker_text(chip, rule, C_ACCENT, size=7)
+        add_text(sh, rx, py + 0.66, rw, 0.34, [
+            [("TRIGGER", 6.5, True, C_MID)],
+            [(trigger, 7.5, False, C_DARK)],
+        ])
+        add_text(sh, rx, py + 1.04, rw, 0.16,
+                 [[("ROLES", 6.5, True, C_MID)]])
+        for n in range(1, 6):
+            ry = py + 1.22 + (n - 1) * 0.19
+            add_text(sh, rx, ry, rw, 0.19, [[
+                (f"{n}  ", 8, True, C_ACCENT),
+                ("[Insert role]", 7.5, False, C_DARK),
+            ]])
+
+        # bottom strip: the call, and the one thing to get right
+        by = py + 2.46
+        add_line(sh, px + 0.14, by, px + pw - 0.14, by, C_LINE, 0.75)
+        add_text(sh, px + 0.16, by + 0.04, 1.90, 0.38, [
+            [("CALL / SIGNAL", 6.5, True, C_MID)],
+            [("[Insert call]", 8.5, True, C_DARK)],
+        ])
+        add_line(sh, px + 2.16, by + 0.06, px + 2.16, py + ph - 0.08,
+                 C_LINE, 0.5)
+        add_text(sh, px + 2.24, by + 0.04, pw - 2.40, 0.60, [
+            [("NON-NEGOTIABLE", 6.5, True, C_ACCENT)],
+            [("[Insert the one detail that must be right]",
+              7.5, False, C_DARK)],
+        ])
+
+    add_footer(slide, "SET PIECES + SPECIAL SITUATIONS  —  futsal-specific "
+                      "restarts and phases  ·  4-second restarts · flying "
+                      "GK powerplay · 10 m accumulated-foul shot  ·  "
+                      "build diagrams from the Component Library")
     return slide
 
 
@@ -1352,13 +1539,104 @@ def build_oncourt_cards(prs):
              dash=MSO_LINE_DASH_STYLE.DASH)
     add_text(sh, 6.46, 0.60, 0.50, 0.16, [[("CUT", 6, True, C_MID)]],
              align=PP_ALIGN.CENTER, wrap=False)
-    add_text(sh, 13.00, 3.93, 0.34, 0.16, [[("CUT", 6, True, C_MID)]],
+    add_text(sh, 12.94, 3.93, 0.34, 0.16, [[("CUT", 6, True, C_MID)]],
              wrap=False)
 
     add_footer(slide, "ON-COURT CARDS  —  print · cut · pocket  ·  one "
                       "card per block  ·  three cues max  ·  readable at "
                       "arm's length")
     return slide
+
+
+# ---------------------------------------------------------------- integrity
+
+def normalise_shape_ids(prs):
+    """Renumber every shape id so each slide's ids are unique.
+
+    Required because the hand-built <p:grpSp> elements carry ids from our
+    own counter while python-pptx derives the next id as max(existing)+1 —
+    the two schemes collide, and duplicate ids are invalid OOXML (PowerPoint
+    repairs the file, LibreOffice refuses to open it). Renumbering in
+    document order is safe: the spTree's own <p:cNvPr> comes first and keeps
+    id 1, every real shape gets the next integer.
+    """
+    fixed = 0
+    for slide in prs.slides:
+        for i, cNvPr in enumerate(slide.shapes._spTree.iter(qn("p:cNvPr"))):
+            new = str(i + 1)
+            if cNvPr.get("id") != new:
+                cNvPr.set("id", new)
+                fixed += 1
+    return fixed
+
+
+def audit_shape_ids(prs):
+    """Return a list of (slide_index, duplicate_id) — empty means valid."""
+    dupes = []
+    for n, slide in enumerate(prs.slides, start=1):
+        seen = set()
+        for cNvPr in slide.shapes._spTree.iter(qn("p:cNvPr")):
+            sid = cNvPr.get("id")
+            if sid in seen:
+                dupes.append((n, sid))
+            seen.add(sid)
+    return dupes
+
+
+# ---------------------------------------------------------------- theme wiring
+
+def apply_theme_colours(prs):
+    """Write the three identity colours into the presentation theme so the
+    PowerPoint colour picker (Design -> Variants -> Colours) drives them."""
+    theme = None
+    for part in prs.part.package.iter_parts():
+        name = str(part.partname)
+        if name.startswith("/ppt/theme/theme") and name.endswith(".xml"):
+            theme = part
+            break
+    if theme is None:                  # pragma: no cover - default pkg has one
+        raise RuntimeError("no theme part found")
+
+    root = getattr(theme, "_element", None)
+    from_blob = root is None
+    if from_blob:
+        root = parse_xml(theme.blob)
+
+    scheme = root.find(".//" + qn("a:clrScheme"))
+    scheme.set("name", "Futsal Session System")
+    # dk1/lt1 stay as system text/background; identity colours go in accents
+    wanted = {"accent1": "0057B8",     # team / primary accent
+              "accent2": "2F3B46",     # opposition / Team B
+              "accent3": "A9B1BB"}     # court lines
+    for tag, rgb in wanted.items():
+        node = scheme.find(qn("a:" + tag))
+        for child in list(node):
+            node.remove(child)
+        node.append(node.makeelement(qn("a:srgbClr"), {"val": rgb}))
+
+    if from_blob:
+        from lxml import etree
+        theme._blob = etree.tostring(root, xml_declaration=True,
+                                     encoding="UTF-8", standalone=True)
+    return scheme.get("name")
+
+
+def link_colours_to_theme(prs):
+    """Repoint every identity colour from a literal <a:srgbClr> to the
+    matching <a:schemeClr>, preserving child transforms such as <a:alpha>.
+    One theme edit then restyles all slides at once."""
+    swapped = 0
+    for slide in prs.slides:
+        for el in list(slide.shapes._spTree.iter(qn("a:srgbClr"))):
+            scheme = THEME_MAP.get((el.get("val") or "").upper())
+            if scheme is None:
+                continue
+            new = el.makeelement(qn("a:schemeClr"), {"val": scheme})
+            for child in list(el):     # keep alpha / lumMod / tint
+                new.append(child)
+            el.getparent().replace(el, new)
+            swapped += 1
+    return swapped
 
 
 # ---------------------------------------------------------------- main
@@ -1379,11 +1657,23 @@ def main():
     add_annotations(guide)
     build_component_library(prs)
     build_control_board(prs)
+    build_set_pieces(prs)
     build_oncourt_cards(prs)
+
+    renumbered = normalise_shape_ids(prs)
+    theme_name = apply_theme_colours(prs)
+    swapped = link_colours_to_theme(prs)
+
+    dupes = audit_shape_ids(prs)
+    if dupes:
+        raise RuntimeError(f"duplicate shape ids remain: {dupes[:5]}")
 
     out = "futsal_session_template.pptx"
     prs.save(out)
     print(f"Saved {out}: {len(prs.slides._sldIdLst)} slides")
+    print(f"Shape ids: {renumbered} renumbered, 0 duplicates remaining")
+    print(f"Theme '{theme_name}': {swapped} colour references linked "
+          f"to accent1/2/3 (one-click recolour enabled)")
 
 
 if __name__ == "__main__":
